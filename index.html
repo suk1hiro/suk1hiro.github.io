@@ -2,7 +2,9 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>热门头条展示</title>
+    <link rel="stylesheet" href="styles.css"> <!-- 引入外部样式表 -->
     <script>
         // 使用新的API获取微博热搜
         async function getWeiboHotKeywords() {
@@ -25,13 +27,18 @@
             return data.data.map(item => item.title); // 假设返回的JSON中有data字段
         }
 
-        function generateRandomString(length) {
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            return result;
+        // 使用新的API获取抖音热榜
+        async function getDouyinHotKeywords() {
+            const response = await fetch('https://v2.xxapi.cn/api/douyinhot');
+            const data = await response.json();
+            return data.data.map(item => item.title); // 假设返回的JSON中有data字段
+        }
+
+        // 使用新的API获取Bilibili热榜
+        async function getBilibiliHotKeywords() {
+            const response = await fetch('https://v2.xxapi.cn/api/bilibilihot');
+            const data = await response.json();
+            return data.data.map(item => item.title); // 假设返回的JSON中有data字段
         }
 
         // 在页面上展示热搜
@@ -45,7 +52,20 @@
                 keywords = await getBaiduHotKeywords();
             } else if (source === 'csdn') {
                 keywords = await getCsdnHotKeywords();
+            } else if (source === 'douyin') {
+                keywords = await getDouyinHotKeywords();
+            } else if (source === 'bilibili') {
+                keywords = await getBilibiliHotKeywords();
             }
+
+            // 将热词显示在页面底部
+            const keywordList = document.getElementById('keywordList');
+            keywordList.innerHTML = ''; // 清空之前的内容
+            keywords.forEach(keyword => {
+                const li = document.createElement('li');
+                li.textContent = keyword;
+                keywordList.appendChild(li);
+            });
 
             // 获取用户设置的间隔
             const minInterval = parseInt(document.getElementById('minInterval').value, 10) * 1000;
@@ -73,22 +93,24 @@
 </head>
 <body>
     <h1>当前热门头条</h1>
-    <ul id="keywordList">
-        <!-- 热门头条将显示在这里 -->
-    </ul>
     <div>
         <label for="sourceSelect">选择热词来源:</label>
         <select id="sourceSelect">
             <option value="weibo">微博热搜</option>
             <option value="baidu">百度热搜</option>
             <option value="csdn">CSDN热搜</option>
+            <option value="douyin">抖音热榜</option>
+            <option value="bilibili">Bilibili热榜</option>
         </select>
-        <br>
         <label for="minInterval">最小间隔（秒）:</label>
         <input type="number" id="minInterval" value="5">
         <label for="maxInterval">最大间隔（秒）:</label>
         <input type="number" id="maxInterval" value="20">
         <button id="startSearch">开始搜索</button>
     </div>
+    <h2>获取到的热词</h2>
+    <ul id="keywordList">
+        <!-- 热门头条将显示在这里 -->
+    </ul>
 </body>
 </html>
