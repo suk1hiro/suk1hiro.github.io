@@ -41,7 +41,7 @@
         async function getBilibiliHotKeywords() {
             const response = await fetch('https://v2.xxapi.cn/api/bilibilihot');
             const data = await response.json();
-            return data.data.map(item => item.title); // 假设返回的JSON中有title字段
+            return data.data.map(item => item.title); // 假设返回的JSON中有data字段
         }
 
         // 在页面上展示热搜
