@@ -4,55 +4,85 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>热门头条展示</title>
-    <link rel="stylesheet" href="styles.css"> <!-- 引入外部样式表 -->
+    <link rel="stylesheet" href="styles.css"> <!-- External stylesheet -->
     <script>
-        // 用于存储打开的窗口句柄
+        // Store window handles
         let openedWindows = [];
+        let currentIntervalId = null; // Store current timer ID
 
-        // 使用新的API获取微博热搜
+        // Helper function to close window
+        function closeWindow(win) {
+            try {
+                if (win && !win.closed) {
+                    win.close();
+                    console.log('成功关闭窗口');
+                } else {
+                    console.log('窗口已经关闭或无效');
+                }
+            } catch (error) {
+                console.error('关闭窗口时出错:', error);
+            }
+        }
+
+        // Function to close all windows
+        function closeAllWindows() {
+            console.log('开始关闭所有窗口，当前窗口数量:', openedWindows.length);
+            openedWindows.forEach(win => {
+                closeWindow(win);
+            });
+            openedWindows = [];
+            console.log('已清空窗口句柄数组');
+        }
+
+        // Function to stop search
+        function stopSearch() {
+            if (currentIntervalId) {
+                clearInterval(currentIntervalId);
+                currentIntervalId = null;
+                console.log('已停止搜索');
+            }
+            closeAllWindows();
+        }
+
+        // Get Weibo hot keywords using new API
         async function getWeiboHotKeywords() {
             const response = await fetch('https://v2.xxapi.cn/api/weibohot');
             const data = await response.json();
-            return data.data.map(item => item.title); // 假设返回的JSON中有data字段
+            return data.data.map(item => item.title); // Assuming data field exists in returned JSON
         }
 
-        // 使用新的API获取百度热搜
+        // Get Baidu hot keywords using new API
         async function getBaiduHotKeywords() {
             const response = await fetch('https://v2.xxapi.cn/api/baiduhot');
             const data = await response.json();
-            return data.data.map(item => item.title); // 假设返回的JSON中有data字段
+            return data.data.map(item => item.title); // Assuming data field exists in returned JSON
         }
 
-        // 使用新的API获取CSDN热搜
+        // Get CSDN hot keywords using new API
         async function getCsdnHotKeywords() {
             const response = await fetch('https://v2.xxapi.cn/api/csdnhot');
             const data = await response.json();
-            return data.data.map(item => item.title); // 假设返回的JSON中有data字段
+            return data.data.map(item => item.title); // Assuming data field exists in returned JSON
         }
 
-        // 使用新的API获取抖音热榜
+        // Get Douyin hot keywords using new API
         async function getDouyinHotKeywords() {
             const response = await fetch('https://v2.xxapi.cn/api/douyinhot');
             const data = await response.json();
-            return data.data.map(item => item.word); // 假设返回的JSON中有word字段
+            return data.data.map(item => item.word); // Assuming word field exists in returned JSON
         }
 
-        // 使用新的API获取Bilibili热榜
+        // Get Bilibili hot keywords using new API
         async function getBilibiliHotKeywords() {
             const response = await fetch('https://v2.xxapi.cn/api/bilibilihot');
             const data = await response.json();
-            return data.data.map(item => item.title); // 假设返回的JSON中有data字段
+            return data.data.map(item => item.title); // Assuming data field exists in returned JSON
         }
 
-        // 在页面上展示热搜
+        // Display hot keywords on page
         async function displayHotKeywords() {
-            // 关闭上一次打开的窗口
-            openedWindows.forEach(win => {
-                if (win && !win.closed) {
-                    win.close();
-                }
-            });
-            openedWindows = []; // 清空窗口句柄数组
+            // Stop previous search if running
+            stopSearch();
 
             const source = document.getElementById('sourceSelect').value;
             let keywords = [];
@@ -69,37 +99,51 @@
                 keywords = await getBilibiliHotKeywords();
             }
 
-            // 将热词显示在页面底部
+            // Display keywords at bottom of page
             const keywordList = document.getElementById('keywordList');
-            keywordList.innerHTML = ''; // 清空之前的内容
+            keywordList.innerHTML = ''; // Clear previous content
             keywords.forEach(keyword => {
                 const li = document.createElement('li');
                 li.textContent = keyword;
                 keywordList.appendChild(li);
             });
 
-            // 获取用户设置的间隔
+            // Get user-set intervals
             const minInterval = parseInt(document.getElementById('minInterval').value, 10) * 1000;
             const maxInterval = parseInt(document.getElementById('maxInterval').value, 10) * 1000;
 
-            // 每隔随机间隔发起一次Bing搜索
+            // Make Bing search at random intervals
             let index = 0;
-            const intervalId = setInterval(() => {
+            currentIntervalId = setInterval(() => {
                 if (index < keywords.length) {
+                    // Close previous window
+                    if (openedWindows.length > 0) {
+                        const lastWindow = openedWindows[openedWindows.length - 1];
+                        closeWindow(lastWindow);
+                        openedWindows.pop();
+                    }
+
                     const keyword = keywords[index];
                     const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(keyword)}&FORM=EDGSPH`;
                     const newWindow = window.open(searchUrl, '_blank');
-                    openedWindows.push(newWindow); // 保存窗口句柄
+                    if (newWindow) {
+                        openedWindows.push(newWindow); // Save window handle
+                        console.log('新窗口已打开，当前窗口数量:', openedWindows.length);
+                    } else {
+                        console.log('新窗口打开失败，可能是被浏览器阻止');
+                    }
                     index++;
                 } else {
-                    clearInterval(intervalId); // 停止定时器
+                    clearInterval(currentIntervalId); // Stop timer
+                    currentIntervalId = null;
                 }
             }, Math.random() * (maxInterval - minInterval) + minInterval);
         }
 
-        // 页面加载后设置按钮点击事件
+        // Set button click events after page loads
         window.onload = function() {
             document.getElementById('startSearch').onclick = displayHotKeywords;
+            document.getElementById('stopSearch').onclick = stopSearch;
         }
     </script>
 </head>
@@ -119,10 +163,11 @@
         <label for="maxInterval">最大间隔（秒）:</label>
         <input type="number" id="maxInterval" value="20">
         <button id="startSearch">开始搜索</button>
+        <button id="stopSearch">停止搜索</button>
     </div>
     <h2>获取到的热词</h2>
     <ul id="keywordList">
-        <!-- 热门头条将显示在这里 -->
+        <!-- Hot headlines will be displayed here -->
     </ul>
 </body>
 </html>
