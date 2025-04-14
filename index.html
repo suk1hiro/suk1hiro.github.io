@@ -79,6 +79,47 @@
             return data.data; // 直接返回字符串数组
         }
 
+        // 获取Hacker News热门新闻
+        async function getHackerNewsHotKeywords() {
+            try {
+                // 首先获取热门新闻的ID列表
+                const response = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
+                const storyIds = await response.json();
+                
+                // 只获取前30个故事
+                const topStories = storyIds.slice(0, 30);
+                
+                // 获取每个故事的详细信息
+                const stories = await Promise.all(
+                    topStories.map(async (id) => {
+                        const storyResponse = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
+                        const story = await storyResponse.json();
+                        return story.title;
+                    })
+                );
+                
+                return stories;
+            } catch (error) {
+                console.error('获取Hacker News数据时出错:', error);
+                return [];
+            }
+        }
+
+        // 获取Google News热门新闻
+        async function getGoogleNewsHotKeywords() {
+            try {
+                // 使用GNews API获取热门新闻，增加max参数到100
+                const response = await fetch('https://gnews.io/api/v4/top-headlines?lang=en&country=us&max=100&apikey=043834870d8b9c4c55af4ebebaa197ad');
+                const data = await response.json();
+                
+                // 提取新闻标题
+                return data.articles.map(article => article.title);
+            } catch (error) {
+                console.error('获取Google News数据时出错:', error);
+                return [];
+            }
+        }
+
         // Display hot keywords on page
         async function displayHotKeywords() {
             // Stop previous search if running
@@ -97,6 +138,10 @@
                 keywords = await getDouyinHotKeywords();
             } else if (source === 'bilibili') {
                 keywords = await getBilibiliHotKeywords();
+            } else if (source === 'hackernews') {
+                keywords = await getHackerNewsHotKeywords();
+            } else if (source === 'googlenews') {
+                keywords = await getGoogleNewsHotKeywords();
             }
 
             // Display keywords at bottom of page
@@ -157,6 +202,8 @@
             <option value="csdn">CSDN热搜</option>
             <option value="douyin">抖音热榜</option>
             <option value="bilibili">Bilibili热榜</option>
+            <option value="hackernews">Hacker News</option>
+            <option value="googlenews">Google News</option>
         </select>
         <label for="minInterval">最小间隔（秒）:</label>
         <input type="number" id="minInterval" value="5">
