@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小学写字练习 · 人教版写字表</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">小学写字练习<span>人教版 · 写字表</span></div>
+  <div class="controls">
+    <label>年级 <select id="gradeSel"></select></label>
+    <div id="volTabs" class="voltabs"></div>
+    <input id="search" type="search" placeholder="搜索汉字 / 拼音">
+    <label class="chk"><input type="checkbox" id="onlyUndone"> 只看未练</label>
+    <button id="testBtn" class="testbtn" type="button">测试模式</button>
+    <span id="progress" class="progress"></span>
+  </div>
+</header>
+
+<main id="content"></main>
+
+<div id="testView" class="testview hidden">
+  <div id="testSetup" class="testsetup">
+    <h2>测试模式 · 拼音闪卡</h2>
+    <div class="trow">
+      <label>年级 <select id="testGrade"></select></label>
+      <label>顺序 <select id="testOrder">
+        <option value="sequential">教材顺序</option>
+        <option value="random">随机打乱</option>
+      </select></label>
+      <span id="unitHint" class="thint">勾选要测试的单元（上、下册同名单元分开显示）</span>
+    </div>
+    <div id="unitList" class="unitlist"></div>
+    <div class="tactions">
+      <button id="startTest" class="primary" type="button">开始测试</button>
+      <button id="testBack" type="button">返回</button>
+    </div>
+  </div>
+
+  <div id="testQuiz" class="testquiz hidden">
+    <div id="testPos" class="tpos"></div>
+    <div id="flashCard" class="flashcard">
+      <div class="flash-inner">
+        <div class="card-face card-front">
+          <div id="fcPinyin" class="fc-pinyin"></div>
+          <div id="fcHint" class="fc-hint" aria-live="polite"></div>
+          <button id="fcReplay" class="fc-btn" type="button">朗读提示</button>
+          <div class="fc-tip">点击卡片翻面</div>
+        </div>
+        <div class="card-face card-back">
+          <div id="fcChar" class="fc-char"></div>
+          <div id="fcMeta" class="fc-meta"></div>
+          <div id="fcWriter" class="fc-writer"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tnav">
+      <button id="testPrev" type="button">← 上一张</button>
+      <button id="testExit" type="button">退出测试</button>
+      <button id="testNext" type="button">下一张 →</button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="overlay hidden">
+  <div class="modal">
+    <button id="closeBtn" class="close" aria-label="关闭">×</button>
+    <div class="mhead">
+      <div id="mChar" class="mchar"></div>
+      <div id="mPinyin" class="mpinyin"></div>
+      <div id="mMeta" class="mmeta"></div>
+    </div>
+    <div id="writerBox" class="writerbox"></div>
+    <div class="mactions">
+      <button id="animBtn">演示笔顺</button>
+      <button id="quizBtn" class="primary">描红练习</button>
+      <button id="resetBtn">重置</button>
+      <button id="speakBtn">朗读</button>
+    </div>
+    <div class="mnav">
+      <button id="prevBtn">← 上一个</button>
+      <span id="posLabel"></span>
+      <button id="nextBtn">下一个 →</button>
+    </div>
+  </div>
+</div>
+
+<script src="data/hanzi.js"></script>
+<script src="data/characters.js"></script>
+<script src="vendor/hanzi-writer.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
