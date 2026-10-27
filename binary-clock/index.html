@@ -1,0 +1,1562 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="根据照片复刻的二进制钟楼：六列四位 BCD 灯阵实时显示本地时、分、秒，并配有同步指针钟与随一日昼夜变化的日晷。">
+<meta name="theme-color" content="#d9d3c5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231b1915'/%3E%3Ccircle cx='32' cy='14' r='5' fill='%23ffcf52'/%3E%3Ccircle cx='32' cy='27' r='5' fill='%235c2a20'/%3E%3Ccircle cx='32' cy='40' r='5' fill='%23ffcf52'/%3E%3Ccircle cx='32' cy='53' r='5' fill='%23ffcf52'/%3E%3C/svg%3E">
+<title>二进制钟楼 · Binary Clock Tower</title>
+<style>
+  :root{
+    --ink:#201c15;
+    --ink-soft:#544b3d;
+    --paper:#f2ede1;
+    --paper-2:#e7dfcf;
+    --gold:#c99b4d;
+    --gold-deep:#8a642d;
+    --amber:#ffbd32;
+    --line:rgba(55,44,26,.16);
+    --line-light:rgba(255,244,217,.18);
+    --tower-w:clamp(175px, min(24vw, 30.5vh), 350px);
+    --serif:"Songti SC","STSong","Noto Serif CJK SC","SimSun",Georgia,serif;
+    --sans:"Bahnschrift","Segoe UI Variable Text","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:"Bahnschrift","DIN Alternate","Roboto Mono","Consolas",monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:#20201b;
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow:hidden;
+  }
+  button,a{font:inherit}
+  .sr-only{
+    position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+  }
+
+  /* ============================== scene ============================== */
+  .app{
+    position:relative;
+    height:100vh;
+    height:100svh;
+    min-height:620px;
+    overflow:hidden;
+    isolation:isolate;
+    background:#d8d3c7;
+  }
+
+  .atmosphere{
+    position:absolute; inset:0; z-index:0;
+    background:
+      radial-gradient(ellipse at 16% 4%, rgba(255,249,226,.76) 0%, rgba(255,249,226,0) 34%),
+      radial-gradient(ellipse at 85% 8%, rgba(246,249,242,.45) 0%, rgba(246,249,242,0) 30%),
+      linear-gradient(180deg,#cad8da 0%,#dde0d7 17%,#ece8dd 42%,#e5ddcd 71%,#c6bda9 100%);
+  }
+  .sun-haze{
+    position:absolute; inset:-18% -10% auto -10%; height:68%; z-index:0;
+    background:radial-gradient(ellipse at 30% 12%,rgba(255,244,203,.62),rgba(255,244,203,0) 58%);
+    filter:blur(8px);
+    pointer-events:none;
+  }
+
+  .architecture{
+    position:absolute; inset:0; z-index:1; pointer-events:none;
+    filter:blur(.8px) saturate(.84) contrast(1.02) brightness(.94);
+    transform:scale(1.015);
+  }
+  .architecture::after{
+    content:""; position:absolute; inset:0;
+    background:
+      linear-gradient(180deg,rgba(240,237,227,.26) 0%,transparent 24%,transparent 62%,rgba(227,217,201,.24) 100%),
+      radial-gradient(ellipse at 50% 44%,transparent 30%,rgba(225,215,197,.18) 70%);
+    pointer-events:none;
+  }
+  .light-shaft{
+    position:absolute; inset:0; z-index:2; pointer-events:none;
+    background:linear-gradient(112deg,transparent 0 28%,rgba(255,248,220,.14) 38%,rgba(255,248,220,.03) 47%,transparent 58%);
+    mix-blend-mode:screen;
+  }
+  .backwall{
+    position:absolute; inset:0;
+    background:
+      linear-gradient(90deg,rgba(64,49,27,.12),transparent 12%,transparent 88%,rgba(64,49,27,.14)),
+      linear-gradient(180deg,rgba(244,241,233,.12),rgba(244,241,233,.55) 48%,rgba(203,193,175,.72));
+  }
+  .center-shadow{
+    position:absolute; left:50%; top:5%; bottom:0; width:min(48vw,720px);
+    transform:translateX(-50%);
+    background:
+      radial-gradient(ellipse at 50% 45%,rgba(73,55,28,.23),rgba(73,55,28,.06) 46%,transparent 67%),
+      linear-gradient(90deg,transparent,rgba(72,56,34,.12) 22%,rgba(72,56,34,.12) 78%,transparent);
+    filter:blur(2px);
+  }
+
+  .wing{
+    position:absolute; top:0; bottom:0; width:39%; overflow:hidden;
+    background:
+      linear-gradient(180deg,rgba(246,244,236,.92),rgba(233,229,218,.8) 48%,rgba(215,208,194,.85));
+    box-shadow:0 0 60px rgba(75,58,32,.09);
+  }
+  .wing-left{
+    left:0;
+    transform:perspective(1500px) rotateY(5deg);
+    transform-origin:left center;
+    border-right:1px solid rgba(255,255,255,.45);
+    box-shadow:16px 0 42px rgba(70,54,30,.12);
+  }
+  .wing-right{
+    right:0;
+    transform:perspective(1500px) rotateY(-5deg);
+    transform-origin:right center;
+    border-left:1px solid rgba(255,255,255,.4);
+    box-shadow:-16px 0 42px rgba(70,54,30,.12);
+  }
+  .wing::after{
+    content:""; position:absolute; inset:0;
+    background:
+      repeating-linear-gradient(0deg,transparent 0 18%,rgba(255,255,255,.22) 18% calc(18% + 1px),transparent calc(18% + 1px) 36%),
+      linear-gradient(90deg,rgba(255,255,255,.18),transparent 12%,transparent 88%,rgba(84,65,38,.08));
+    mix-blend-mode:soft-light;
+  }
+
+  .window-bank{
+    position:absolute;
+    overflow:hidden;
+    border:8px solid rgba(239,237,227,.94);
+    outline:1px solid rgba(78,87,85,.34);
+    background:
+      repeating-linear-gradient(90deg,rgba(229,232,226,.9) 0 4px,transparent 4px calc(50% - 3px),rgba(229,232,226,.9) calc(50% - 3px) 50%),
+      repeating-linear-gradient(0deg,rgba(229,232,226,.9) 0 4px,transparent 4px calc(33.333% - 3px),rgba(229,232,226,.9) calc(33.333% - 3px) 33.333%),
+      linear-gradient(152deg,#afbec0 0%,#6f8387 25%,#3c5158 52%,#4b6268 74%,#92a2a2 100%);
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,.4),
+      0 0 0 11px rgba(224,219,207,.24),
+      0 26px 48px rgba(54,41,22,.19),
+      inset 0 0 0 3px rgba(61,76,80,.34),
+      inset 0 0 45px rgba(20,32,35,.6);
+  }
+  .window-bank::after{
+    content:""; position:absolute; inset:0;
+    background:
+      linear-gradient(116deg,rgba(255,255,255,.26) 0%,rgba(255,255,255,.05) 22%,transparent 39%,transparent 69%,rgba(255,255,255,.1) 82%,transparent 100%);
+    mix-blend-mode:screen;
+  }
+  .wb-left{left:14%; top:17%; width:58%; height:25%; opacity:.56}
+  .wb-right{right:7%; top:10%; width:66%; height:29%; opacity:.66}
+
+  .pier{
+    position:absolute; top:6%; bottom:6%; width:4.6%;
+    opacity:.46;
+    background:
+      linear-gradient(90deg,rgba(90,74,51,.16),transparent 18%,rgba(255,255,255,.42) 42%,rgba(255,255,255,.08) 66%,rgba(74,60,40,.14));
+    filter:blur(.7px);
+    z-index:2;
+  }
+  .pier-left{left:33.5%}
+  .pier-right{right:33.5%}
+
+  .slab{
+    position:absolute; left:-4%; right:-4%; height:2.1%;
+    background:linear-gradient(180deg,rgba(249,247,239,.92),rgba(217,211,199,.9) 72%,rgba(179,171,157,.7));
+    box-shadow:0 9px 18px rgba(52,41,24,.14), inset 0 1px 0 rgba(255,255,255,.7);
+    opacity:.72;
+  }
+  .slab-a{top:51%}
+  .slab-b{top:75%}
+  .slab-c{top:30%; height:1.1%; opacity:.4}
+
+  .balcony{
+    position:absolute; overflow:hidden;
+    background:
+      linear-gradient(180deg,rgba(89,111,117,.6),rgba(58,77,83,.62) 45%,rgba(101,121,124,.42));
+    border-top:6px solid rgba(239,240,232,.94);
+    border-bottom:9px solid rgba(224,222,211,.95);
+    box-shadow:0 20px 32px rgba(53,42,26,.2), inset 0 8px 22px rgba(24,37,40,.31);
+  }
+  .balcony::before{
+    content:""; position:absolute; inset:9% 0 12%;
+    background:repeating-linear-gradient(90deg,rgba(224,234,233,.96) 0 2px,transparent 2px 13px);
+    opacity:.9;
+  }
+  .balcony::after{
+    content:""; position:absolute; left:0; right:0; top:9%; height:3px;
+    background:rgba(238,243,240,.97);
+    box-shadow:0 8px 0 rgba(232,238,235,.75), 0 16px 0 rgba(221,229,227,.6), 0 24px 0 rgba(215,223,221,.4);
+  }
+  .balcony-left{left:10%; top:38%; width:54%; height:20%; opacity:.66}
+  .balcony-right{right:8%; top:55%; width:61%; height:22%; opacity:.72}
+
+  .ground{
+    position:absolute; left:0; right:0; bottom:0; height:13%;
+    background:
+      radial-gradient(ellipse at 22% 30%,rgba(117,115,102,.35),transparent 28%),
+      radial-gradient(ellipse at 74% 58%,rgba(90,83,68,.3),transparent 24%),
+      linear-gradient(180deg,rgba(123,116,101,.08),rgba(126,119,104,.7) 32%,rgba(92,88,78,.92));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .ground::before{
+    content:""; position:absolute; inset:0;
+    background:
+      repeating-linear-gradient(112deg,transparent 0 6px,rgba(255,255,255,.05) 6px 7px,transparent 7px 14px),
+      repeating-linear-gradient(28deg,transparent 0 9px,rgba(20,18,14,.08) 9px 10px,transparent 10px 21px);
+    opacity:.55;
+  }
+
+  .foliage{
+    position:absolute; right:-4%; bottom:-4%; width:42vw; height:41vh;
+    min-width:380px; pointer-events:none; z-index:7;
+    opacity:.88;
+    filter:drop-shadow(0 8px 16px rgba(28,39,18,.16));
+  }
+  .foliage-left{
+    position:absolute; left:-8%; bottom:-11%; width:28vw; height:22vh; min-width:260px;
+    z-index:3; pointer-events:none;
+    background:
+      radial-gradient(ellipse at 28% 58%,#4f6136 0 7%,transparent 8%),
+      radial-gradient(ellipse at 42% 68%,#6c7f4b 0 8%,transparent 9%),
+      radial-gradient(ellipse at 55% 52%,#3d502a 0 9%,transparent 10%),
+      radial-gradient(ellipse at 66% 66%,#5e7340 0 7%,transparent 8%),
+      radial-gradient(ellipse at 78% 56%,#43582e 0 8%,transparent 9%);
+    filter:blur(4px) saturate(.8);
+    opacity:.6;
+  }
+
+  /* ============================== tower ============================== */
+  .tower-wrap{
+    position:absolute; left:50%; top:49.5%;
+    transform:translate(-50%,-50%);
+    z-index:6;
+    width:var(--tower-w);
+    filter:drop-shadow(22px 38px 42px rgba(45,31,12,.34)) drop-shadow(0 6px 10px rgba(45,31,12,.18));
+    animation:tower-in 1.1s cubic-bezier(.19,1,.22,1) both;
+  }
+  @keyframes tower-in{
+    from{opacity:0; transform:translate(-50%,-48%)}
+    to{opacity:1; transform:translate(-50%,-50%)}
+  }
+
+  .tower{
+    position:relative;
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:calc(var(--tower-w) * .028);
+    padding:calc(var(--tower-w) * .022) 0 calc(var(--tower-w) * .026);
+    background:
+      linear-gradient(90deg,rgba(64,38,4,.34) 0%,rgba(78,48,8,.12) 5%,rgba(255,238,191,.14) 12%,transparent 36%,transparent 64%,rgba(78,48,8,.1) 90%,rgba(64,38,4,.36) 100%),
+      linear-gradient(180deg,#d6aa5e 0%,#c99a4e 10%,#d1a356 30%,#c39447 52%,#b5863c 72%,#cc9f53 88%,#b48339 100%);
+    box-shadow:
+      inset 2px 0 0 rgba(255,244,205,.25),
+      inset -2px 0 0 rgba(74,45,9,.32),
+      inset 0 1px 0 rgba(255,247,218,.38),
+      inset 0 -2px 0 rgba(73,45,9,.22),
+      18px 30px 55px rgba(44,29,9,.2);
+  }
+  .tower::before{
+    content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(ellipse at 18% 12%,rgba(255,239,188,.18),transparent 22%),
+      radial-gradient(ellipse at 84% 25%,rgba(94,57,12,.1),transparent 28%),
+      radial-gradient(ellipse at 26% 52%,rgba(255,242,199,.12),transparent 18%),
+      radial-gradient(ellipse at 72% 63%,rgba(90,54,11,.11),transparent 22%),
+      radial-gradient(ellipse at 38% 86%,rgba(255,238,190,.1),transparent 19%);
+    mix-blend-mode:soft-light;
+  }
+  .tower::after{
+    content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='160' filter='url(%23p)' opacity='.5'/%3E%3C/svg%3E");
+    opacity:.1;
+    mix-blend-mode:multiply;
+  }
+  .tower > *{position:relative; z-index:1}
+
+  .top-dial{
+    position:relative;
+    width:86%;
+    aspect-ratio:1.2;
+    padding:1.5%;
+    background:
+      linear-gradient(135deg,#f6f4ec 0%,#d6d4ca 18%,#a9a8a0 38%,#ecebe3 57%,#bebdb4 78%,#8a8a82 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.75),
+      inset 0 -1px 0 rgba(48,44,35,.4),
+      0 2px 0 rgba(87,56,12,.35),
+      0 12px 20px rgba(49,33,11,.24);
+    border-radius:1px;
+    overflow:hidden;
+  }
+  .top-dial::after{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:
+      linear-gradient(115deg,rgba(255,255,255,.3) 0%,rgba(255,255,255,.06) 17%,transparent 33%,transparent 67%,rgba(255,255,255,.08) 84%,transparent 100%),
+      radial-gradient(ellipse at 28% 5%,rgba(255,255,255,.18),transparent 40%);
+    mix-blend-mode:screen;
+  }
+  .top-dial svg{display:block; width:100%; height:100%; background:#eae7df}
+
+  .niche{
+    width:82%;
+    aspect-ratio:4.6;
+    padding:1.6% 2.1%;
+    background:
+      linear-gradient(180deg,#654416 0%,#946b2c 14%,#bc8f46 50%,#9a6f2e 87%,#5f3f15 100%);
+    box-shadow:
+      inset 0 2px 3px rgba(38,24,5,.62),
+      inset 0 -1px 0 rgba(255,238,185,.24);
+  }
+  .niche-face{
+    display:block; width:100%; height:100%;
+    background:
+      linear-gradient(180deg,rgba(50,37,26,.48) 0%,rgba(70,53,38,.12) 18%,transparent 38%),
+      linear-gradient(90deg,rgba(58,43,30,.36),transparent 11%,transparent 89%,rgba(58,43,30,.36)),
+      linear-gradient(180deg,#9a8878 0%,#c9baad 15%,#d9cec1 47%,#c8b8aa 79%,#a08d7d 100%);
+    box-shadow:
+      inset 0 16px 22px rgba(36,23,9,.48),
+      inset 10px 0 18px rgba(42,27,11,.26),
+      inset -10px 0 18px rgba(42,27,11,.26),
+      inset 0 -4px 10px rgba(37,24,10,.3);
+    border-radius:1px;
+    position:relative;
+    overflow:hidden;
+  }
+  .niche-face::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(100deg,rgba(255,255,255,.16),transparent 28%,transparent 75%,rgba(70,51,32,.08));
+    mix-blend-mode:soft-light;
+  }
+
+  .clock{
+    position:relative;
+    width:87%;
+    aspect-ratio:1;
+    flex:0 0 auto;
+    z-index:2;
+  }
+  .clock-frame{
+    position:absolute; inset:0;
+    padding:4%;
+    border-radius:3px;
+    background:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.045) 0 1px,transparent 1px 3px),
+      linear-gradient(135deg,#f7f5ef 0%,#d8d6ce 11%,#a5a49c 26%,#e6e5dd 43%,#c2c1b8 58%,#898880 77%,#dddcd4 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.8),
+      inset 0 -2px 2px rgba(46,40,30,.38),
+      0 3px 0 rgba(69,45,12,.42),
+      0 16px 24px rgba(44,29,9,.3);
+  }
+  .clock-frame::before{
+    content:""; position:absolute; inset:2.2%;
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.4), inset 0 -1px 1px rgba(0,0,0,.35);
+    border-radius:1px;
+    pointer-events:none;
+  }
+  .clock-inner{
+    position:relative;
+    width:100%; height:100%;
+    overflow:hidden;
+    background:#111;
+    box-shadow:
+      0 0 0 1px rgba(25,24,21,.9),
+      inset 0 2px 8px rgba(0,0,0,.75),
+      inset 0 0 0 2px rgba(0,0,0,.25);
+  }
+
+  /* ---------------------------- analog face ---------------------------- */
+  .analog .clock-inner{background:#c9a564}
+  .dial-svg{display:block; width:100%; height:100%}
+  .analog-glass{
+    position:absolute; inset:0; pointer-events:none;
+    background:
+      linear-gradient(113deg,rgba(255,255,255,.2) 0%,rgba(255,255,255,.045) 14%,transparent 31%,transparent 66%,rgba(255,255,255,.075) 82%,transparent 100%),
+      radial-gradient(ellipse at 28% 10%,rgba(255,255,255,.18),transparent 42%);
+    box-shadow:inset 0 0 36px rgba(54,34,6,.2), inset 0 0 0 1px rgba(255,248,226,.18);
+    mix-blend-mode:screen;
+  }
+  .analog .hand{filter:drop-shadow(0 1px .7px rgba(25,17,5,.36))}
+  .analog .glass-glare{
+    position:absolute; left:10%; top:-10%; width:34%; height:76%;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+    transform:rotate(18deg);
+    filter:blur(1.5px);
+    pointer-events:none;
+  }
+
+  /* ---------------------------- binary face ---------------------------- */
+  .binary .clock-inner{background:#080807}
+  .led-screen{
+    position:absolute; inset:2.3%;
+    overflow:hidden;
+    border-radius:1px;
+    background:
+      radial-gradient(ellipse at 50% 30%,#201b18 0%,#131110 48%,#0a0909 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(178,174,160,.08),
+      inset 0 12px 30px rgba(0,0,0,.84),
+      inset 0 0 60px rgba(0,0,0,.6);
+  }
+  .led-screen::before{
+    content:""; position:absolute; inset:0; z-index:2; pointer-events:none;
+    background:
+      linear-gradient(114deg,rgba(255,255,255,.095) 0%,rgba(255,255,255,.022) 17%,transparent 34%,transparent 67%,rgba(255,255,255,.045) 85%,transparent 100%),
+      radial-gradient(ellipse at 26% 4%,rgba(255,255,255,.07),transparent 34%);
+    mix-blend-mode:screen;
+  }
+  .led-screen::after{
+    content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
+    background:
+      repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px),
+      radial-gradient(ellipse at 50% 88%,rgba(255,74,8,.1),transparent 60%);
+    opacity:.55;
+  }
+  .led-grid{
+    position:absolute; left:7.5%; right:7.5%; top:49.5%; bottom:7%;
+    z-index:1;
+    display:grid;
+    grid-template-columns:repeat(6,minmax(0,1fr));
+    grid-template-rows:repeat(4,minmax(0,1fr));
+    column-gap:4%;
+    row-gap:7%;
+  }
+  .led-cell{
+    display:flex; align-items:center; justify-content:center;
+    min-width:0; min-height:0;
+  }
+  .lamp{
+    position:relative;
+    width:88%;
+    max-width:88%;
+    aspect-ratio:1;
+    border-radius:50%;
+    background:
+      repeating-conic-gradient(from 0deg,rgba(255,185,120,.16) 0deg 2.5deg,rgba(0,0,0,.2) 2.5deg 5deg),
+      radial-gradient(circle at 34% 27%,#87462f 0%,#5e2b1f 21%,#431b14 49%,#290e0a 76%,#150605 100%);
+    box-shadow:
+      inset 0 1px 1px rgba(255,169,123,.26),
+      inset 0 -2px 3px rgba(0,0,0,.86),
+      0 1px 0 rgba(255,255,255,.04);
+    transition:
+      background .18s ease,
+      box-shadow .24s ease,
+      transform .18s ease;
+  }
+  .lamp::before{
+    content:""; position:absolute; inset:9%;
+    border-radius:50%;
+    background:
+      repeating-conic-gradient(from 12deg,rgba(255,178,108,.2) 0deg 3deg,rgba(0,0,0,.15) 3deg 7deg);
+    opacity:.7;
+    mix-blend-mode:soft-light;
+  }
+  .lamp::after{
+    content:""; position:absolute; left:26%; top:19%; width:28%; height:20%;
+    border-radius:50%;
+    background:rgba(255,196,146,.2);
+    filter:blur(.7px);
+    opacity:.55;
+  }
+  .lamp.on{
+    background:
+      radial-gradient(circle at 49% 46%,#fffde8 0%,#fff7bd 13%,#ffe36f 27%,#ffc12c 45%,#ff8a16 63%,#e84908 79%,#8e1f02 100%);
+    box-shadow:
+      0 0 2px #fffce4,
+      0 0 6px 1px rgba(255,244,160,.98),
+      0 0 13px 3px rgba(255,175,24,.78),
+      0 0 28px 9px rgba(255,78,0,.32),
+      inset 0 0 5px rgba(255,252,219,.95),
+      inset 0 -2px 4px rgba(146,34,0,.48);
+    transform:scale(1.025);
+    z-index:1;
+  }
+  .lamp.on::before{
+    inset:0;
+    background:radial-gradient(circle at 50% 52%,rgba(255,255,240,.78) 0%,rgba(255,243,155,.25) 30%,transparent 66%);
+    opacity:1;
+    mix-blend-mode:screen;
+    filter:blur(.6px);
+  }
+  .lamp.on::after{
+    left:18%; top:10%; width:32%; height:24%;
+    background:rgba(255,255,246,.9);
+    opacity:.95;
+    filter:blur(1.4px);
+  }
+
+  /* ============================== foreground grain ============================== */
+  .vignette{
+    position:absolute; inset:0; z-index:20; pointer-events:none;
+    background:
+      radial-gradient(ellipse at 50% 44%,transparent 48%,rgba(43,33,19,.18) 100%),
+      linear-gradient(180deg,rgba(250,248,237,.16),transparent 16%,transparent 74%,rgba(54,43,27,.16));
+    mix-blend-mode:multiply;
+  }
+  .grain{
+    position:absolute; inset:0; z-index:21; pointer-events:none; opacity:.06;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+    mix-blend-mode:multiply;
+  }
+
+  /* ============================== UI ============================== */
+  .status{
+    position:absolute; top:clamp(18px,3.4vh,36px); right:clamp(18px,3.6vw,56px);
+    z-index:30;
+    display:flex; align-items:center; gap:10px;
+    padding:9px 13px;
+    color:var(--ink-soft);
+    background:rgba(244,239,227,.58);
+    border:1px solid rgba(86,68,42,.14);
+    border-radius:999px;
+    backdrop-filter:blur(12px) saturate(.9);
+    box-shadow:0 8px 26px rgba(53,40,21,.08);
+    font-size:10px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .pulse{
+    display:block; width:6px; height:6px; border-radius:50%;
+    background:#5c8c53;
+    box-shadow:0 0 0 3px rgba(92,140,83,.14);
+    animation:pulse 2.3s ease-in-out infinite;
+  }
+  .status.demo .pulse{background:#b47a24; box-shadow:0 0 0 3px rgba(180,122,36,.16)}
+  @keyframes pulse{
+    0%,100%{opacity:.55; transform:scale(.88)}
+    50%{opacity:1; transform:scale(1)}
+  }
+  .status .status-sep{width:1px;height:11px;background:rgba(75,61,39,.2)}
+  .status .status-date{font-variant-numeric:tabular-nums; letter-spacing:.1em; opacity:.8}
+
+  .masthead{
+    position:absolute;
+    top:clamp(24px,5vh,54px);
+    left:clamp(20px,4vw,64px);
+    z-index:30;
+    width:min(29vw,350px);
+    padding:clamp(20px,2.2vw,30px) clamp(20px,2.2vw,30px) clamp(22px,2.4vw,30px);
+    background:linear-gradient(155deg,rgba(249,245,235,.92),rgba(239,233,220,.8));
+    border:1px solid rgba(71,56,34,.13);
+    border-radius:2px;
+    box-shadow:
+      0 30px 70px rgba(50,37,18,.14),
+      inset 0 1px 0 rgba(255,255,255,.55);
+    backdrop-filter:blur(16px) saturate(.92);
+    animation:ui-in 1.15s .1s cubic-bezier(.19,1,.22,1) both;
+  }
+  @keyframes ui-in{
+    from{opacity:0; transform:translateY(12px)}
+    to{opacity:1; transform:translateY(0)}
+  }
+  .masthead::after{
+    content:""; position:absolute; inset:9px; pointer-events:none;
+    border:1px solid rgba(92,71,38,.07);
+  }
+  .masthead-top{display:flex; align-items:center; gap:12px}
+  .seal{
+    display:grid; place-items:center;
+    width:32px; height:32px; flex:0 0 32px;
+    border-radius:50%;
+    border:1px solid rgba(65,51,30,.34);
+    color:#4d3d26;
+    font-family:var(--mono); font-size:10px; letter-spacing:.04em;
+    background:
+      radial-gradient(circle at 36% 28%,rgba(255,255,255,.7),transparent 52%),
+      rgba(220,207,183,.55);
+    box-shadow:inset 0 0 0 3px rgba(250,246,236,.36);
+  }
+  .eyebrow{
+    margin:0;
+    font-family:var(--mono);
+    font-size:10px; line-height:1.5;
+    letter-spacing:.17em;
+    text-transform:uppercase;
+    color:#6c5a3e;
+  }
+  .eyebrow .no{color:#9a7a43}
+  h1{
+    margin:22px 0 10px;
+    font-family:var(--serif);
+    font-size:clamp(32px,3.1vw,46px);
+    font-weight:500;
+    line-height:1.08;
+    letter-spacing:.015em;
+    color:#241f16;
+  }
+  h1 em{font-style:normal; color:#80673f}
+  .tagline{
+    margin:0 0 16px;
+    font-family:var(--serif);
+    font-size:14px; line-height:1.55;
+    font-style:italic;
+    color:#79674b;
+    letter-spacing:.015em;
+  }
+  .desc{
+    margin:0;
+    font-size:12.5px; line-height:1.85;
+    letter-spacing:.02em;
+    color:#5c5040;
+  }
+  .desc b{font-weight:600; color:#3d3121; white-space:nowrap}
+  .desc .solar-note{display:block; margin-top:7px; color:#695a41}
+  .desc .solar-note b{font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:#8b652d; white-space:nowrap}
+  .masthead-rule{
+    width:100%; height:1px; margin:20px 0 16px;
+    background:linear-gradient(90deg,rgba(82,65,39,.28),rgba(82,65,39,.04));
+  }
+  .bit-legend{display:flex; align-items:center; gap:16px}
+  .mini-stack{
+    display:flex; flex-direction:column; gap:4px; align-items:center;
+    flex:0 0 auto;
+  }
+  .mini-dot{
+    width:9px; height:9px; border-radius:50%;
+    background:radial-gradient(circle at 36% 30%,#8d533a,#4b2118 58%,#24100b);
+    box-shadow:inset 0 1px 1px rgba(255,180,130,.25), inset 0 -1px 1px rgba(0,0,0,.65);
+  }
+  .mini-dot.on{
+    background:radial-gradient(circle at 48% 44%,#fffbe0,#ffd14d 42%,#ff8d12 76%,#b52d00);
+    box-shadow:0 0 4px rgba(255,220,120,.9),0 0 10px rgba(255,120,10,.5);
+  }
+  .mini-labels{
+    display:flex; flex-direction:column; gap:3px;
+    font-family:var(--mono); font-size:8px; letter-spacing:.08em;
+    color:#8b7655; line-height:1;
+  }
+  .bit-copy{flex:1; min-width:0}
+  .bit-copy .binary{
+    font-family:var(--mono); font-size:17px; letter-spacing:.12em;
+    color:#2f281d; font-variant-numeric:tabular-nums;
+  }
+  .bit-copy .binary span{color:#a0783e; margin:0 5px}
+  .bit-copy .note{
+    margin-top:4px;
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.12em;
+    color:#8b7655; text-transform:uppercase;
+  }
+
+  .readout{
+    position:absolute;
+    right:clamp(20px,4vw,64px);
+    bottom:clamp(22px,5vh,56px);
+    z-index:30;
+    width:min(29vw,350px);
+    padding:clamp(18px,2vw,26px) clamp(18px,2vw,26px) clamp(16px,1.8vw,22px);
+    color:#f4eddd;
+    background:
+      radial-gradient(ellipse at 90% 0%,rgba(255,176,42,.1),transparent 38%),
+      linear-gradient(150deg,rgba(35,31,25,.94),rgba(22,20,17,.96));
+    border:1px solid rgba(255,220,155,.17);
+    border-radius:2px;
+    box-shadow:
+      0 34px 70px rgba(43,30,13,.28),
+      inset 0 1px 0 rgba(255,242,207,.12);
+    backdrop-filter:blur(12px);
+    animation:ui-in 1.15s .22s cubic-bezier(.19,1,.22,1) both;
+  }
+  .readout::before{
+    content:""; position:absolute; inset:8px; pointer-events:none;
+    border:1px solid rgba(255,230,177,.08);
+  }
+  .readout-head{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    font-family:var(--mono); font-size:9px; letter-spacing:.17em; text-transform:uppercase;
+    color:rgba(240,226,198,.58);
+  }
+  .live{
+    display:inline-flex; align-items:center; gap:7px;
+    color:#e8c98d;
+  }
+  .live i{
+    display:block;width:5px;height:5px;border-radius:50%;
+    background:var(--amber);
+    box-shadow:0 0 8px rgba(255,185,50,.85);
+  }
+  .big-time{
+    display:flex; align-items:baseline; justify-content:flex-start;
+    gap:clamp(2px,.35vw,6px);
+    margin:18px 0 17px;
+    font-family:var(--mono);
+    font-size:clamp(38px,4vw,56px);
+    line-height:.94;
+    letter-spacing:.012em;
+    font-variant-numeric:tabular-nums;
+    color:#f8f0dc;
+    text-shadow:0 0 22px rgba(255,200,100,.08);
+  }
+  .big-time .colon{
+    color:#aa8b55;
+    font-size:.63em;
+    transform:translateY(-.05em);
+    letter-spacing:0;
+    font-variant-numeric:normal;
+  }
+  .big-time .time-group{
+    position:relative;
+    display:inline-flex;
+    align-items:baseline;
+    justify-content:center;
+    min-width:1.12em;
+  }
+  .big-time span.digit{
+    display:inline-block;
+    min-width:1.12em;
+    text-align:center;
+  }
+  .big-time .time-group small{
+    position:absolute;
+    left:50%;
+    top:calc(100% + 4px);
+    transform:translateX(-50%);
+    font-family:var(--mono);
+    font-size:8px;
+    line-height:1;
+    letter-spacing:.19em;
+    color:rgba(232,215,182,.4);
+    white-space:nowrap;
+  }
+  .readout-foot{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+    margin-top:14px; padding-top:12px;
+    border-top:1px solid rgba(240,220,180,.12);
+  }
+  .date-line{
+    font-family:var(--mono); font-size:9px; letter-spacing:.1em;
+    line-height:1.55; color:rgba(239,228,207,.72);
+    white-space:nowrap;
+  }
+  .date-line .weekday{color:rgba(255,214,140,.75)}
+  .code-line{
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.08em;
+    color:rgba(235,220,191,.45);
+    text-align:right; line-height:1.55;
+    overflow-wrap:anywhere;
+  }
+  .code-line b{font-weight:400;color:rgba(255,208,120,.66)}
+
+  .footnote{display:none}
+
+  .mobile-hint{display:none}
+
+  /* ============================== responsive ============================== */
+  @media (max-width: 1050px){
+    .masthead{width:min(32vw,315px)}
+    .readout{width:min(32vw,315px)}
+    .desc{display:none}
+    .masthead-rule{margin:16px 0 13px}
+    .tagline{margin-bottom:0}
+  }
+
+  @media (max-width: 820px){
+    :root{--tower-w:clamp(175px, min(50vw, 24.5vh), 250px)}
+    .app{min-height:600px}
+    .wing{width:54%}
+    .window-bank{filter:blur(1px)}
+    .wb-left{opacity:.28}
+    .wb-right{opacity:.3}
+    .balcony-left{opacity:.3}
+    .balcony-right{opacity:.32}
+    .status{display:none}
+    .masthead{
+      top:12px; left:12px; right:12px;
+      width:auto; max-width:none;
+      padding:9px 13px 10px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .masthead-top{gap:8px; flex:0 0 auto}
+    .seal{width:25px;height:25px;flex-basis:25px;font-size:7.5px}
+    .eyebrow{font-size:7.5px; letter-spacing:.11em; white-space:nowrap}
+    .eyebrow .no{display:none}
+    h1{
+      margin:0 0 0 auto;
+      font-size:clamp(20px,5.4vw,26px);
+      line-height:1;
+      white-space:nowrap;
+    }
+    .tagline,.desc,.masthead-rule,.bit-legend,.footnote{display:none}
+    .tower-wrap{top:48.1%}
+    .mobile-hint{
+      display:block;
+      position:absolute; top:60px; left:0; right:0; z-index:25;
+      text-align:center;
+      font-family:var(--mono); font-size:7.5px; letter-spacing:.12em;
+      color:rgba(66,55,38,.56);
+      text-transform:uppercase;
+      pointer-events:none;
+    }
+    .readout{
+      left:50%; right:auto; bottom:10px;
+      transform:translateX(-50%);
+      width:calc(100vw - 24px);
+      max-width:390px;
+      padding:10px 14px 10px;
+      animation:none;
+    }
+    .big-time{font-size:clamp(30px,8vw,38px); margin:7px 0 16px}
+    .readout-head{font-size:8px}
+    .readout-foot{margin-top:7px; padding-top:7px}
+    .date-line{font-size:8px}
+    .code-line{display:none}
+    .foliage{width:52vw; height:26vh; min-width:260px; opacity:.7}
+  }
+
+  @media (max-width: 480px){
+    .masthead{top:10px; left:10px; right:10px; padding:8px 11px 9px; gap:8px}
+    .masthead-top{gap:7px}
+    .seal{width:23px;height:23px;flex-basis:23px;font-size:7px}
+    .status{display:none}
+    h1{font-size:20px}
+  }
+
+  @media (max-width: 820px) and (max-height: 720px){
+    :root{--tower-w:clamp(140px, min(41vw, 22vh), 210px)}
+    .tower-wrap{top:47.5%}
+    .mobile-hint{display:block; top:50px}
+    .masthead{top:8px; left:8px; right:8px; padding:6px 10px 7px}
+    .masthead .seal{width:21px;height:21px;flex-basis:21px}
+    .masthead .eyebrow{display:none}
+    h1{font-size:19px; margin-left:0}
+    .readout{bottom:8px; padding:8px 12px 8px}
+    .big-time{font-size:clamp(26px,7vw,32px); margin:4px 0 13px}
+    .readout-head{font-size:7.5px}
+    .readout-foot{margin-top:5px; padding-top:5px}
+    .date-line{font-size:7.5px}
+  }
+
+  @media (max-height: 740px) and (min-width: 821px){
+    .masthead{padding-top:18px;padding-bottom:18px}
+    h1{font-size:clamp(28px,3vw,38px); margin:14px 0 8px}
+    .tagline{display:none}
+    .desc{font-size:11.5px; line-height:1.7}
+    .masthead-rule{margin:14px 0 12px}
+    .big-time{font-size:clamp(34px,3.6vw,46px)}
+    .readout{padding-top:16px;padding-bottom:14px}
+    .status-date{display:none}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+    .pulse{animation:none}
+  }
+  .no-motion .tower-wrap,.no-motion .masthead,.no-motion .readout,.no-motion .footnote{animation:none!important}
+  .no-motion .pulse{animation:none}
+  .no-motion .lamp{transition:none}
+
+  .noscript{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    z-index:100; padding:18px 24px;
+    color:#f4eddd; background:#1b1814;
+    border:1px solid rgba(255,220,155,.18);
+    font-size:13px; letter-spacing:.05em;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <noscript><div class="noscript">请启用 JavaScript 以显示实时二进制时间。</div></noscript>
+  <div class="atmosphere" aria-hidden="true">
+    <div class="sun-haze"></div>
+  </div>
+
+  <div class="architecture" aria-hidden="true">
+    <div class="backwall"></div>
+    <div class="wing wing-left">
+      <div class="window-bank wb-left"></div>
+      <div class="balcony balcony-left"></div>
+      <div class="slab slab-c"></div>
+      <div class="slab slab-a"></div>
+      <div class="slab slab-b"></div>
+    </div>
+    <div class="wing wing-right">
+      <div class="window-bank wb-right"></div>
+      <div class="balcony balcony-right"></div>
+      <div class="slab slab-c"></div>
+      <div class="slab slab-a"></div>
+      <div class="slab slab-b"></div>
+    </div>
+    <div class="pier pier-left"></div>
+    <div class="pier pier-right"></div>
+    <div class="center-shadow"></div>
+    <div class="ground"></div>
+    <div class="foliage-left"></div>
+    <svg class="foliage" viewBox="0 0 700 420" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+      <defs>
+        <filter id="leaf-soft" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation=".9"/>
+        </filter>
+        <linearGradient id="leaf-dark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#587038"/><stop offset="1" stop-color="#314423"/>
+        </linearGradient>
+        <linearGradient id="leaf-mid" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7f9455"/><stop offset="1" stop-color="#4d6432"/>
+        </linearGradient>
+      </defs>
+      <g filter="url(#leaf-soft)">
+        <path d="M705 421 C 640 344, 583 299, 505 258 C 449 229, 415 199, 394 160" fill="none" stroke="#4b3822" stroke-width="5" stroke-linecap="round" opacity=".66"/>
+        <path d="M620 333 C 575 318, 549 286, 538 254" fill="none" stroke="#4b3822" stroke-width="2.2" stroke-linecap="round" opacity=".5"/>
+        <path d="M514 262 C 487 246, 474 223, 474 202" fill="none" stroke="#4b3822" stroke-width="2" stroke-linecap="round" opacity=".46"/>
+        <g fill="url(#leaf-dark)">
+          <ellipse cx="393" cy="154" rx="19" ry="42" transform="rotate(-28 393 154)"/>
+          <ellipse cx="448" cy="188" rx="20" ry="48" transform="rotate(-48 448 188)"/>
+          <ellipse cx="499" cy="218" rx="21" ry="50" transform="rotate(-67 499 218)"/>
+          <ellipse cx="555" cy="250" rx="20" ry="44" transform="rotate(-20 555 250)"/>
+          <ellipse cx="610" cy="293" rx="22" ry="49" transform="rotate(-48 610 293)"/>
+          <ellipse cx="658" cy="330" rx="18" ry="39" transform="rotate(-18 658 330)"/>
+          <ellipse cx="577" cy="328" rx="17" ry="38" transform="rotate(34 577 328)"/>
+          <ellipse cx="532" cy="282" rx="15" ry="33" transform="rotate(20 532 282)"/>
+          <ellipse cx="630" cy="371" rx="18" ry="40" transform="rotate(22 630 371)"/>
+        </g>
+        <g fill="url(#leaf-mid)" opacity=".92">
+          <ellipse cx="417" cy="176" rx="13" ry="33" transform="rotate(18 417 176)"/>
+          <ellipse cx="476" cy="205" rx="15" ry="35" transform="rotate(11 476 205)"/>
+          <ellipse cx="527" cy="243" rx="14" ry="36" transform="rotate(-5 527 243)"/>
+          <ellipse cx="581" cy="281" rx="16" ry="39" transform="rotate(23 581 281)"/>
+          <ellipse cx="638" cy="321" rx="13" ry="33" transform="rotate(8 638 321)"/>
+          <ellipse cx="557" cy="293" rx="10" ry="26" transform="rotate(-27 557 293)"/>
+          <ellipse cx="674" cy="370" rx="16" ry="38" transform="rotate(26 674 370)"/>
+          <ellipse cx="465" cy="155" rx="10" ry="24" transform="rotate(42 465 155)"/>
+        </g>
+        <g fill="#2f4422" opacity=".8">
+          <ellipse cx="600" cy="261" rx="9" ry="25" transform="rotate(-36 600 261)"/>
+          <ellipse cx="661" cy="308" rx="8" ry="23" transform="rotate(-12 661 308)"/>
+          <ellipse cx="545" cy="232" rx="8" ry="24" transform="rotate(-50 545 232)"/>
+        </g>
+        <g fill="#31492a" opacity=".72" transform="translate(20,-18)">
+          <ellipse cx="676" cy="170" rx="17" ry="34" transform="rotate(-45 676 170)"/>
+          <ellipse cx="635" cy="122" rx="13" ry="28" transform="rotate(-25 635 122)"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="light-shaft" aria-hidden="true"></div>
+
+  <div class="tower-wrap">
+    <div class="tower" role="img" aria-label="二进制钟楼，当前时间由下方六列灯表示">
+      <div class="top-dial">
+        <svg class="solar-dial" viewBox="0 0 300 250" role="img" aria-label="日晷：随一日时间移动的日月轨迹">
+          <defs>
+            <linearGradient id="dial-paper" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#f2efe7"/>
+              <stop offset=".55" stop-color="#e5e1d7"/>
+              <stop offset="1" stop-color="#d8d3c7"/>
+            </linearGradient>
+            <radialGradient id="dial-sheen" cx="32%" cy="22%" r="80%">
+              <stop offset="0" stop-color="#fffdf6" stop-opacity=".72"/>
+              <stop offset=".55" stop-color="#fffdf6" stop-opacity="0"/>
+              <stop offset="1" stop-color="#7c7464" stop-opacity=".1"/>
+            </radialGradient>
+            <radialGradient id="solar-sun-halo" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stop-color="#ffdf8b" stop-opacity=".9"/>
+              <stop offset=".42" stop-color="#ffc857" stop-opacity=".34"/>
+              <stop offset="1" stop-color="#ffb83d" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="solar-moon-halo" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stop-color="#dce9ec" stop-opacity=".7"/>
+              <stop offset=".48" stop-color="#a9c2cd" stop-opacity=".22"/>
+              <stop offset="1" stop-color="#8aa6b5" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="solar-sun-beam" x1="150" y1="27" x2="150" y2="198" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#e6a445" stop-opacity="0"/>
+              <stop offset=".58" stop-color="#e6a445" stop-opacity=".08"/>
+              <stop offset="1" stop-color="#f2bc67" stop-opacity=".24"/>
+            </linearGradient>
+            <linearGradient id="solar-moon-beam" x1="150" y1="27" x2="150" y2="198" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#48647b" stop-opacity="0"/>
+              <stop offset=".58" stop-color="#48647b" stop-opacity=".07"/>
+              <stop offset="1" stop-color="#6f90a6" stop-opacity=".2"/>
+            </linearGradient>
+          </defs>
+
+          <rect width="300" height="250" fill="url(#dial-paper)"/>
+          <rect width="300" height="250" fill="url(#dial-sheen)"/>
+          <rect id="solarWarm" width="300" height="250" fill="#e8a35f" opacity="0"/>
+          <rect id="solarCool" width="300" height="250" fill="#2f4b63" opacity="0"/>
+
+          <g id="solarSunBeam" opacity="1">
+            <path id="solarSunBeamPath" d="M150 27 L 141 198 L 159 198 Z" fill="url(#solar-sun-beam)"/>
+            <line id="solarSunBeamLine" x1="150" y1="27" x2="150" y2="198"
+                  stroke="#d5a04c" stroke-width=".9" opacity=".5"/>
+          </g>
+          <g id="solarMoonBeam" opacity="0">
+            <path id="solarMoonBeamPath" d="M150 27 L 141 198 L 159 198 Z" fill="url(#solar-moon-beam)"/>
+            <line id="solarMoonBeamLine" x1="150" y1="27" x2="150" y2="198"
+                  stroke="#68879c" stroke-width=".8" opacity=".4"/>
+          </g>
+
+          <rect x="7" y="7" width="286" height="236" fill="none" stroke="#b9b3a5" stroke-width="1"/>
+          <rect x="15" y="15" width="270" height="220" fill="none" stroke="#8b8476" stroke-width=".8" opacity=".55"/>
+          <line x1="15" y1="209" x2="285" y2="209" stroke="#3d392f" stroke-width="1" opacity=".7"/>
+          <g stroke="#39352c" stroke-width=".85" opacity=".72">
+            <line x1="150" y1="26" x2="28" y2="209"/>
+            <line x1="150" y1="26" x2="54" y2="209"/>
+            <line x1="150" y1="26" x2="81" y2="209"/>
+            <line x1="150" y1="26" x2="108" y2="209"/>
+            <line x1="150" y1="26" x2="135" y2="209"/>
+            <line x1="150" y1="26" x2="150" y2="209"/>
+            <line x1="150" y1="26" x2="165" y2="209"/>
+            <line x1="150" y1="26" x2="192" y2="209"/>
+            <line x1="150" y1="26" x2="219" y2="209"/>
+            <line x1="150" y1="26" x2="246" y2="209"/>
+            <line x1="150" y1="26" x2="272" y2="209"/>
+            <line x1="150" y1="26" x2="15" y2="132"/>
+            <line x1="150" y1="26" x2="28" y2="72"/>
+            <line x1="150" y1="26" x2="285" y2="132"/>
+            <line x1="150" y1="26" x2="272" y2="72"/>
+          </g>
+          <g stroke="#39352c" stroke-width=".7" opacity=".65">
+            <line x1="35" y1="215" x2="35" y2="228"/>
+            <line x1="61" y1="215" x2="61" y2="222"/>
+            <line x1="87" y1="215" x2="87" y2="222"/>
+            <line x1="113" y1="215" x2="113" y2="222"/>
+            <line x1="139" y1="215" x2="139" y2="228"/>
+            <line x1="165" y1="215" x2="165" y2="222"/>
+            <line x1="191" y1="215" x2="191" y2="222"/>
+            <line x1="217" y1="215" x2="217" y2="222"/>
+            <line x1="243" y1="215" x2="243" y2="222"/>
+            <line x1="269" y1="215" x2="269" y2="228"/>
+          </g>
+          <g fill="#37332b" font-family="Georgia,'Times New Roman',serif" font-size="12" text-anchor="middle">
+            <text x="30" y="130">9</text>
+            <text x="270" y="130">3</text>
+            <text x="63" y="237">10</text>
+            <text x="107" y="237">11</text>
+            <text x="150" y="237">12</text>
+            <text x="193" y="237">1</text>
+            <text x="237" y="237">2</text>
+          </g>
+          <g fill="#2d2a24">
+            <circle cx="132" cy="26" r="3.2"/>
+            <circle cx="150" cy="20" r="4"/>
+            <circle cx="168" cy="26" r="3.2"/>
+          </g>
+          <g stroke="#39352c" stroke-width=".8" opacity=".8">
+            <line x1="132" y1="32" x2="132" y2="44"/>
+            <line x1="150" y1="26" x2="150" y2="44"/>
+            <line x1="168" y1="32" x2="168" y2="44"/>
+          </g>
+
+          <g class="solar-caption" aria-hidden="true">
+            <text x="20" y="30" fill="#77664e" font-family="'Bahnschrift','Segoe UI',sans-serif"
+                  font-size="8.2" letter-spacing=".8">日晷 / SOLAR</text>
+            <text id="solarTime" x="20" y="46" fill="#3e3223" font-family="'Bahnschrift','Segoe UI',sans-serif"
+                  font-size="13" letter-spacing=".3">13:28</text>
+            <text id="solarPhaseTag" x="280" y="31" fill="#5d4b32" text-anchor="end"
+                  font-family="'Songti SC','STSong','SimSun',Georgia,serif" font-size="11.5">午后</text>
+            <text id="solarPercentTag" x="280" y="46" fill="#8a7452" text-anchor="end"
+                  font-family="'Bahnschrift','Segoe UI',sans-serif" font-size="8.2"
+                  letter-spacing=".5">DAY 62%</text>
+          </g>
+
+          <g id="solarSun" transform="translate(150 198)" opacity="1">
+            <circle r="13" fill="url(#solar-sun-halo)"/>
+            <g stroke="#d9a13b" stroke-width="1.1" stroke-linecap="round" opacity=".8">
+              <line x1="0" y1="-10.5" x2="0" y2="-13.5"/>
+              <line x1="0" y1="10.5" x2="0" y2="13.5"/>
+              <line x1="-10.5" y1="0" x2="-13.5" y2="0"/>
+              <line x1="10.5" y1="0" x2="13.5" y2="0"/>
+              <line x1="-7.5" y1="-7.5" x2="-9.7" y2="-9.7"/>
+              <line x1="7.5" y1="-7.5" x2="9.7" y2="-9.7"/>
+              <line x1="-7.5" y1="7.5" x2="-9.7" y2="9.7"/>
+              <line x1="7.5" y1="7.5" x2="9.7" y2="9.7"/>
+            </g>
+            <circle r="6.4" fill="#ffd36c" stroke="#d69a2e" stroke-width=".8"/>
+            <circle cx="-2.4" cy="-2.2" r="1.9" fill="#fff6d0" opacity=".85"/>
+          </g>
+          <g id="solarMoon" transform="translate(150 198)" opacity="0">
+            <circle r="12" fill="url(#solar-moon-halo)"/>
+            <circle r="6.4" fill="#f4f0de" stroke="#526878" stroke-width=".8"/>
+            <circle cx="-1.9" cy="-1.8" r="1.5" fill="#c6c7b7" opacity=".8"/>
+            <circle cx="2.1" cy="1.3" r=".95" fill="#c6c7b7" opacity=".65"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="niche"><span class="niche-face"></span></div>
+
+      <section class="clock analog" aria-label="与二进制时间同步的指针时钟">
+        <div class="clock-frame">
+          <div class="clock-inner">
+            <svg class="dial-svg" viewBox="0 0 300 300" role="img" aria-label="指针时钟盘面">
+              <defs>
+                <radialGradient id="gold-face" cx="41%" cy="34%" r="76%">
+                  <stop offset="0" stop-color="#f1dfae"/>
+                  <stop offset=".34" stop-color="#e1c07c"/>
+                  <stop offset=".68" stop-color="#c99e53"/>
+                  <stop offset=".88" stop-color="#b98b43"/>
+                  <stop offset="1" stop-color="#a57632"/>
+                </radialGradient>
+                <radialGradient id="gold-light" cx="34%" cy="26%" r="70%">
+                  <stop offset="0" stop-color="#fff0c6" stop-opacity=".58"/>
+                  <stop offset=".48" stop-color="#f5d99f" stop-opacity=".12"/>
+                  <stop offset=".86" stop-color="#8e621f" stop-opacity=".06"/>
+                  <stop offset="1" stop-color="#5f3f12" stop-opacity=".28"/>
+                </radialGradient>
+                <radialGradient id="face-grain" cx="50%" cy="50%" r="60%">
+                  <stop offset="0" stop-color="#fff6d8" stop-opacity=".09"/>
+                  <stop offset=".55" stop-color="#a17532" stop-opacity=".03"/>
+                  <stop offset="1" stop-color="#6e4a15" stop-opacity=".16"/>
+                </radialGradient>
+                <pattern id="meander" width="32" height="32" patternUnits="userSpaceOnUse">
+                  <path d="M2 2h28v28H2z" fill="none" stroke="#7c5927" stroke-width="1" opacity=".28"/>
+                  <path d="M7 26V8h18v11H13v-5h7" fill="none" stroke="#7c5927" stroke-width="1.25" opacity=".48"/>
+                  <path d="M12 21h9" fill="none" stroke="#7c5927" stroke-width=".8" opacity=".3"/>
+                </pattern>
+              </defs>
+              <rect width="300" height="300" fill="#a87d39"/>
+              <rect x="4" y="4" width="292" height="292" fill="#c49b58" stroke="#6e4d22" stroke-width="2"/>
+              <rect x="10" y="10" width="280" height="280" fill="#cfa660"/>
+              <rect x="10" y="10" width="280" height="280" fill="url(#meander)"/>
+              <rect x="10" y="10" width="280" height="280" fill="url(#gold-light)" opacity=".8"/>
+              <circle cx="150" cy="151" r="126" fill="#cb9e54" stroke="#67471d" stroke-width="2.6"/>
+              <circle cx="150" cy="151" r="122" fill="url(#gold-face)"/>
+              <circle cx="150" cy="151" r="122" fill="url(#gold-light)"/>
+              <circle cx="150" cy="151" r="122" fill="url(#face-grain)"/>
+              <circle cx="150" cy="151" r="122" fill="none" stroke="#6b4a1e" stroke-width=".9" opacity=".75"/>
+              <circle cx="150" cy="151" r="118" fill="none" stroke="#f2db9f" stroke-width="1" opacity=".38"/>
+              <circle cx="150" cy="151" r="108" fill="none" stroke="#6c4b1f" stroke-width=".55" opacity=".25"/>
+              <circle cx="150" cy="151" r="117" fill="none" stroke="#6b4a1e" stroke-width="6.5" opacity=".24" stroke-dasharray=".7 4.4"/>
+              <g id="ticks" stroke="#5d431f"></g>
+              <g fill="#3e2c15" font-family="Georgia,'Times New Roman',serif" font-size="24" text-anchor="middle" dominant-baseline="middle">
+                <text x="150" y="66">12</text>
+                <text x="193" y="77">1</text>
+                <text x="224" y="108">2</text>
+                <text x="236" y="152">3</text>
+                <text x="224" y="196">4</text>
+                <text x="193" y="227">5</text>
+                <text x="150" y="238">6</text>
+                <text x="107" y="227">7</text>
+                <text x="76" y="196">8</text>
+                <text x="64" y="152">9</text>
+                <text x="76" y="108">10</text>
+                <text x="107" y="77">11</text>
+              </g>
+              <text x="150" y="205" text-anchor="middle" fill="#5f431e" opacity=".68"
+                    font-family="Georgia,'Times New Roman',serif" font-size="5.4" letter-spacing="2.1">B I N A R Y</text>
+              <g id="hourHand" class="hand">
+                <path d="M146.3 160 L148.4 96 L150 87 L151.6 96 L153.7 160 Z" fill="#2b2114"/>
+              </g>
+              <g id="minuteHand" class="hand">
+                <path d="M147.8 161 L149 66 L150 53 L151 66 L152.2 161 Z" fill="#2b2114"/>
+              </g>
+              <g id="secondHand" class="hand">
+                <line x1="150" y1="184" x2="150" y2="48" stroke="#4b3215" stroke-width="1.55" stroke-linecap="round"/>
+                <circle cx="150" cy="176" r="3.3" fill="#4b3215"/>
+              </g>
+              <circle cx="150" cy="151" r="6.4" fill="#2b2114"/>
+              <circle cx="150" cy="151" r="2.8" fill="#cba45d" stroke="#5d3f17" stroke-width=".7"/>
+            </svg>
+            <div class="glass-glare"></div>
+            <div class="analog-glass"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="niche"><span class="niche-face"></span></div>
+
+      <section class="clock binary" aria-label="六列四位二进制时钟">
+        <div class="clock-frame">
+          <div class="clock-inner">
+            <div class="led-screen">
+              <div class="led-grid" id="ledGrid" aria-hidden="true"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="niche"><span class="niche-face"></span></div>
+    </div>
+  </div>
+
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="status" id="status">
+    <span class="pulse" aria-hidden="true"></span>
+    <span id="statusLabel">LIVE · 本地时间</span>
+    <span class="status-sep" aria-hidden="true"></span>
+    <span class="status-date" id="statusDate">2026.10.24</span>
+  </div>
+
+  <header class="masthead">
+    <div class="masthead-top">
+      <span class="seal" aria-hidden="true">BCD</span>
+      <p class="eyebrow">Binary Clock Tower <span class="no">/ No. 01</span></p>
+    </div>
+    <h1>二进制<em>钟楼</em></h1>
+    <p class="tagline">A clock that tells time in light.</p>
+    <p class="desc">
+      六列红光，每列四位二进制。自上而下读作 <b>8 · 4 · 2 · 1</b>，依次拼出时、分、秒。<span class="solar-note">日晷读数：<b id="solarNote">13:28 · 午后 · DAY 62%</b></span>
+    </p>
+    <div class="masthead-rule" aria-hidden="true"></div>
+    <div class="bit-legend" aria-hidden="true">
+      <div class="mini-stack">
+        <span class="mini-dot"></span>
+        <span class="mini-dot"></span>
+        <span class="mini-dot on"></span>
+        <span class="mini-dot on"></span>
+      </div>
+      <div class="mini-labels">
+        <span>8</span><span>4</span><span>2</span><span>1</span>
+      </div>
+      <div class="bit-copy">
+        <div class="binary">0011<span>=</span>3</div>
+        <div class="note">Top → bottom / 4 bits</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="mobile-hint"><span id="mobileSolar">日晷 13:28 · 午后</span> ／ 灯阵 8 · 4 · 2 · 1</div>
+
+  <aside class="readout" aria-label="当前时间的十进制读法">
+    <div class="readout-head">
+      <span class="live"><i aria-hidden="true"></i>LOCAL TIME</span>
+      <span id="zoneLabel">UTC+08:00</span>
+    </div>
+    <div class="big-time" aria-hidden="true">
+      <span class="time-group"><span class="digit" id="hourDigits">13</span><small>HH</small></span>
+      <span class="colon">:</span>
+      <span class="time-group"><span class="digit" id="minuteDigits">28</span><small>MM</small></span>
+      <span class="colon">:</span>
+      <span class="time-group"><span class="digit" id="secondDigits">25</span><small>SS</small></span>
+    </div>
+    <div class="readout-foot">
+      <div class="date-line"><span id="dateMain">2026.10.24</span> · <span class="weekday" id="weekdayMain">周六</span></div>
+      <div class="code-line" id="codeLine"><b>0001 0011</b> · 0010 1000 · 0010 0101</div>
+    </div>
+  </aside>
+
+  <p class="sr-only" aria-live="off" id="srTime">当前时间 13 时 28 分 25 秒。</p>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const app = document.getElementById('app');
+  const grid = document.getElementById('ledGrid');
+  const hourEl = document.getElementById('hourDigits');
+  const minuteEl = document.getElementById('minuteDigits');
+  const secondEl = document.getElementById('secondDigits');
+  const dateMain = document.getElementById('dateMain');
+  const weekdayMain = document.getElementById('weekdayMain');
+  const statusDate = document.getElementById('statusDate');
+  const codeLine = document.getElementById('codeLine');
+  const zoneLabel = document.getElementById('zoneLabel');
+  const status = document.getElementById('status');
+  const statusLabel = document.getElementById('statusLabel');
+  const srTime = document.getElementById('srTime');
+  const hourHand = document.getElementById('hourHand');
+  const minuteHand = document.getElementById('minuteHand');
+  const secondHand = document.getElementById('secondHand');
+
+  const solarNote = document.getElementById('solarNote');
+  const mobileSolar = document.getElementById('mobileSolar');
+  const solarDial = document.querySelector('.solar-dial');
+  const solarTime = document.getElementById('solarTime');
+  const solarPhaseTag = document.getElementById('solarPhaseTag');
+  const solarPercentTag = document.getElementById('solarPercentTag');
+  const solarWarm = document.getElementById('solarWarm');
+  const solarCool = document.getElementById('solarCool');
+  const solarSun = document.getElementById('solarSun');
+  const solarMoon = document.getElementById('solarMoon');
+  const solarSunBeam = document.getElementById('solarSunBeam');
+  const solarMoonBeam = document.getElementById('solarMoonBeam');
+  const solarSunBeamPath = document.getElementById('solarSunBeamPath');
+  const solarSunBeamLine = document.getElementById('solarSunBeamLine');
+  const solarMoonBeamPath = document.getElementById('solarMoonBeamPath');
+  const solarMoonBeamLine = document.getElementById('solarMoonBeamLine');
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('static') === '1') app.classList.add('no-motion');
+
+  const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const pad = (n) => String(n).padStart(2, '0');
+  const NS = 'http://www.w3.org/2000/svg';
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+  const smoothstep = (edge0, edge1, x) => {
+    const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+
+  // Optional frozen demo time, e.g. ?t=13:28:25. Handy for comparing with the photo.
+  let demo = null;
+  const demoParam = params.get('t');
+  if (demoParam) {
+    const m = /^(\d{1,2}):(\d{2}):(\d{2})$/.exec(demoParam.trim());
+    if (m) {
+      const h = Number(m[1]), mi = Number(m[2]), s = Number(m[3]);
+      if (h < 24 && mi < 60 && s < 60) demo = { h, m: mi, s };
+    }
+  }
+
+  const digits = [0, 0, 0, 0, 0, 0];
+  const lamps = [];
+
+  function buildGrid() {
+    const frag = document.createDocumentFragment();
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 6; col++) {
+        const cell = document.createElement('div');
+        cell.className = 'led-cell';
+        const lamp = document.createElement('span');
+        lamp.className = 'lamp';
+        lamp.dataset.col = String(col);
+        lamp.dataset.row = String(row);
+        lamp.setAttribute('aria-hidden', 'true');
+        cell.appendChild(lamp);
+        frag.appendChild(cell);
+        lamps[row * 6 + col] = lamp;
+      }
+    }
+    grid.appendChild(frag);
+  }
+
+  function buildTicks() {
+    const g = document.getElementById('ticks');
+    const cx = 150, cy = 151;
+    for (let i = 0; i < 60; i++) {
+      const major = i % 5 === 0;
+      const angle = (i / 60) * Math.PI * 2;
+      const inner = major ? 104 : 110;
+      const outer = 118;
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', String(cx + Math.sin(angle) * inner));
+      line.setAttribute('y1', String(cy - Math.cos(angle) * inner));
+      line.setAttribute('x2', String(cx + Math.sin(angle) * outer));
+      line.setAttribute('y2', String(cy - Math.cos(angle) * outer));
+      line.setAttribute('stroke-width', major ? '1.7' : '.7');
+      line.setAttribute('opacity', major ? '.8' : '.52');
+      g.appendChild(line);
+    }
+  }
+
+  function solarInfo(hours) {
+    let zh, en;
+    if (hours >= 5 && hours < 7) { zh = '黎明'; en = 'DAWN'; }
+    else if (hours >= 7 && hours < 11) { zh = '上午'; en = 'MORNING'; }
+    else if (hours >= 11 && hours < 13) { zh = '正午'; en = 'NOON'; }
+    else if (hours >= 13 && hours < 17) { zh = '午后'; en = 'AFTERNOON'; }
+    else if (hours >= 17 && hours < 19) { zh = '黄昏'; en = 'DUSK'; }
+    else if (hours >= 19 && hours < 23) { zh = '夜晚'; en = 'EVENING'; }
+    else { zh = '深夜'; en = 'NIGHT'; }
+
+    const day = hours >= 6 && hours < 18;
+    const percent = day
+      ? ((hours - 6) / 12) * 100
+      : ((((hours - 18) % 24 + 24) % 24) / 12) * 100;
+
+    return {
+      phase: zh,
+      phaseEn: en,
+      mode: day ? 'DAY' : 'NIGHT',
+      percent: clamp(Math.round(percent), 0, 100)
+    };
+  }
+
+  let lastSolarInfo = solarInfo(12);
+  let lastSolarPosition = { sunX: 150, moonX: 150, sunY: 198, sun: 1, moon: 0 };
+
+  function sunPosition(hours) {
+    const h = clamp(hours, 6, 18);
+    if (h <= 9) {
+      const t = (h - 6) / 3;
+      return { x: 26 + t * 4, y: 198 - (1 - t) * 28 };
+    }
+    if (h <= 15) {
+      return { x: 30 + ((h - 9) / 6) * 240, y: 198 };
+    }
+    const t = (h - 15) / 3;
+    return { x: 270 + t * 4, y: 198 - t * 28 };
+  }
+
+  function setBeam(pathEl, lineEl, x, y) {
+    const left = x - 8;
+    const right = x + 8;
+    pathEl.setAttribute('d', 'M150 27 L ' + left.toFixed(1) + ' ' + y.toFixed(1) +
+      ' L ' + right.toFixed(1) + ' ' + y.toFixed(1) + ' Z');
+    lineEl.setAttribute('x2', x.toFixed(1));
+    lineEl.setAttribute('y2', y.toFixed(1));
+  }
+
+  function updateSolar(hours, updateText, nowHour, nowMinute) {
+    const sun = smoothstep(5.5, 6.5, hours) * (1 - smoothstep(17.5, 18.5, hours));
+    const moon = 1 - sun;
+
+    const sunPos = sunPosition(hours);
+    let nightP;
+    if (hours >= 17.5 && hours < 18) nightP = 0;
+    else nightP = clamp(((((hours - 18) % 24) + 24) % 24) / 12, 0, 1);
+    const moonX = 30 + nightP * 240;
+    const moonY = 198;
+    const sunX = sunPos.x;
+    const sunY = sunPos.y;
+    lastSolarPosition = { sunX, moonX, sunY, sun, moon };
+
+    solarSun.setAttribute('transform', 'translate(' + sunX.toFixed(1) + ' ' + sunY.toFixed(1) + ')');
+    solarMoon.setAttribute('transform', 'translate(' + moonX.toFixed(1) + ' ' + moonY + ')');
+    solarSun.setAttribute('opacity', sun.toFixed(3));
+    solarMoon.setAttribute('opacity', moon.toFixed(3));
+    solarSunBeam.setAttribute('opacity', (sun * 0.95).toFixed(3));
+    solarMoonBeam.setAttribute('opacity', (moon * 0.8).toFixed(3));
+    setBeam(solarSunBeamPath, solarSunBeamLine, sunX, sunY);
+    setBeam(solarMoonBeamPath, solarMoonBeamLine, moonX, moonY);
+
+    const twilight = 4 * sun * (1 - sun);
+    solarWarm.setAttribute('opacity', (0.025 + 0.13 * twilight).toFixed(3));
+    solarCool.setAttribute('opacity', (0.22 * (1 - sun)).toFixed(3));
+
+    if (updateText) {
+      const info = solarInfo(hours);
+      lastSolarInfo = info;
+      const label = pad(nowHour) + ':' + pad(nowMinute);
+      solarTime.textContent = label;
+      solarPhaseTag.textContent = info.phase;
+      solarPercentTag.textContent = info.mode + ' ' + info.percent + '%';
+      solarNote.textContent = label + ' · ' + info.phase + ' · ' + info.mode + ' ' + info.percent + '%';
+      mobileSolar.textContent = '日晷 ' + label + ' · ' + info.phase;
+      solarDial.setAttribute('aria-label',
+        '日晷：' + label + '，' + info.phase + '，' + (info.mode === 'DAY' ? '白昼' : '夜间') +
+        ' ' + info.percent + '%。');
+    }
+  }
+
+  function toDigits(h, m, s) {
+    return [
+      Math.floor(h / 10), h % 10,
+      Math.floor(m / 10), m % 10,
+      Math.floor(s / 10), s % 10
+    ];
+  }
+
+  function updateDots(ds) {
+    for (let col = 0; col < 6; col++) {
+      const d = ds[col];
+      digits[col] = d;
+      for (let row = 0; row < 4; row++) {
+        const on = (d & (8 >> row)) !== 0;
+        const lamp = lamps[row * 6 + col];
+        if (lamp) lamp.classList.toggle('on', on);
+      }
+    }
+  }
+
+  function format_date(t) {
+    const y = t.getFullYear();
+    const mo = pad(t.getMonth() + 1);
+    const d = pad(t.getDate());
+    return {
+      main: y + '.' + mo + '.' + d,
+      status: y + '.' + mo + '.' + d,
+      weekday: WEEKDAYS[t.getDay()]
+    };
+  }
+
+  function getZone() {
+    const off = -new Date().getTimezoneOffset();
+    const sign = off >= 0 ? '+' : '-';
+    const abs = Math.abs(off);
+    return 'UTC' + sign + pad(Math.floor(abs / 60)) + ':' + pad(abs % 60);
+  }
+
+  function timeNow() {
+    const t = new Date();
+    if (demo) {
+      t.setHours(demo.h, demo.m, demo.s, 0);
+      return { t, frozen: true };
+    }
+    return { t, frozen: false };
+  }
+
+  let lastKey = '';
+  function render() {
+    const now = timeNow();
+    const t = now.t;
+    const h = t.getHours(), m = t.getMinutes(), s = t.getSeconds();
+    const ds = toDigits(h, m, s);
+    const key = h + ':' + m + ':' + s;
+    const changedSecond = key !== lastKey;
+
+    if (changedSecond) {
+      lastKey = key;
+      updateDots(ds);
+      hourEl.textContent = pad(h);
+      minuteEl.textContent = pad(m);
+      secondEl.textContent = pad(s);
+      const solarNow = solarInfo(h + (m + s / 60) / 60);
+      srTime.textContent = '当前时间 ' + h + ' 时 ' + m + ' 分 ' + s + ' 秒，二进制表示 ' +
+        ds.map((n) => n.toString(2).padStart(4, '0')).join(' ') + '。当前时段：' +
+        solarNow.phase + '，' + (solarNow.mode === 'DAY' ? '白昼' : '夜间') + ' ' + solarNow.percent + '%。';
+      document.title = pad(h) + ':' + pad(m) + ':' + pad(s) + ' · 二进制钟楼';
+
+      const f = format_date(t);
+      dateMain.textContent = f.main;
+      weekdayMain.textContent = f.weekday;
+      statusDate.textContent = f.status;
+      const d = ds;
+      codeLine.innerHTML = '<b>' + d[0].toString(2).padStart(4, '0') + ' ' + d[1].toString(2).padStart(4, '0') + '</b> · ' +
+        d[2].toString(2).padStart(4, '0') + ' ' + d[3].toString(2).padStart(4, '0') + ' · ' +
+        d[4].toString(2).padStart(4, '0') + ' ' + d[5].toString(2).padStart(4, '0');
+    }
+
+    const ms = now.frozen ? 0 : t.getMilliseconds();
+    const seconds = s + ms / 1000;
+    const minutes = m + seconds / 60;
+    const hours = (h % 12) + minutes / 60;
+    hourHand.setAttribute('transform', 'rotate(' + (hours * 30) + ' 150 151)');
+    minuteHand.setAttribute('transform', 'rotate(' + (minutes * 6) + ' 150 151)');
+    secondHand.setAttribute('transform', 'rotate(' + (seconds * 6) + ' 150 151)');
+
+    updateSolar(h + minutes / 60, changedSecond, h, m);
+  }
+
+  function loop() {
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  buildGrid();
+  buildTicks();
+
+  zoneLabel.textContent = getZone();
+  if (demo) {
+    status.classList.add('demo');
+    statusLabel.textContent = 'DEMO · ' + pad(demo.h) + ':' + pad(demo.m) + ':' + pad(demo.s);
+  }
+
+  render();
+  requestAnimationFrame(loop);
+
+  // Small, dependency-free surface for automated checks.
+  window.__BINARY_CLOCK__ = {
+    get digits() { return digits.slice(); },
+    get mode() { return demo ? 'demo' : 'live'; },
+    get demoTime() { return demo ? { ...demo } : null; },
+    get solar() {
+      return {
+        phase: lastSolarInfo.phase,
+        phaseEn: lastSolarInfo.phaseEn,
+        mode: lastSolarInfo.mode,
+        percent: lastSolarInfo.percent,
+        sunX: lastSolarPosition.sunX,
+        moonX: lastSolarPosition.moonX,
+        sun: lastSolarPosition.sun,
+        moon: lastSolarPosition.moon
+      };
+    },
+    pattern(h, m, s) {
+      return toDigits(h, m, s).map((n) => n.toString(2).padStart(4, '0'));
+    }
+  };
+})();
+</script>
+</body>
+</html>
