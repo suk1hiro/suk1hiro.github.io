@@ -1,0 +1,21 @@
+{
+  "name": "craft-checkin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "方块清单 · Minecraft 方块风格的离线每日打卡网页应用",
+  "scripts": {
+    "build": "node tools/build.js",
+    "test:core": "node tests/core.test.js",
+    "test:ui": "node tests/ui.test.js",
+    "test:ocr": "node tests/ocr.test.js"
+  },
+  "keywords": [
+    "checkin",
+    "habit",
+    "minecraft",
+    "crafting",
+    "offline",
+    "local-first"
+  ],
+  "license": "MIT"
+}

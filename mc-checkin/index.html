@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#17150f">
+<title>方块清单 · Craft Check-in</title>
+<meta name="description" content="把今天，合成出来。每日打卡、周期任务、手写扫描、合成记录与定时提醒。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23744a2b'/%3E%3Crect width='32' height='12' fill='%235f9137'/%3E%3Cpath fill='%2381b84e' d='M0 0h8v4H0zm12 0h10v4H12zm16 0h4v4h-4zM4 8h12v4H4zm16 0h8v4h-8z'/%3E%3Cpath fill='%235b3d23' d='M4 16h8v8H4zm16 0h8v8h-8zM12 20h8v8h-8z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<style>
+/* ===== OCR 扫描手写记事（本功能独立样式，不改变 Minecraft 主题主体） ===== */
+.ocr-modal{width:min(1120px,96vw);max-height:92dvh;display:flex;flex-direction:column}
+.ocr-modal .modal-body{overflow-y:auto;overscroll-behavior:contain}
+.ocr-layout{display:grid;grid-template-columns:minmax(0,.86fr) minmax(0,1.14fr);gap:18px;align-items:start}
+.ocr-source,.ocr-work{min-width:0;display:flex;flex-direction:column;gap:10px}
+.ocr-dropzone{position:relative;min-height:300px;display:grid;place-items:center;border:3px dashed var(--line-3);background:var(--slot-bg);box-shadow:inset 2px 2px 0 rgba(0,0,0,.55);cursor:pointer;overflow:hidden;transition:border-color .15s,background .15s}
+.ocr-dropzone:hover{border-color:var(--gold)}
+.ocr-dropzone:focus-visible{outline:3px solid var(--diamond);outline-offset:2px}
+.ocr-dropzone.is-dragover{border-color:var(--gold);background:rgba(242,201,76,.1)}
+.ocr-dropzone.has-image{min-height:220px;background:#0a0907}
+.ocr-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px 18px;text-align:center;color:var(--text-3)}
+.ocr-empty strong{color:var(--text);font-size:14px;letter-spacing:.03em}
+.ocr-empty p{margin:0;font-size:11px;line-height:1.7;max-width:230px}
+.ocr-empty-icon{width:42px;height:42px;color:var(--gold);filter:drop-shadow(0 0 10px rgba(242,201,76,.25))}
+.ocr-preview{display:block;width:100%;max-height:430px;object-fit:contain;image-rendering:auto}
+.ocr-source-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ocr-help{margin:0;font-size:11px;line-height:1.7;color:var(--text-4)}
+.ocr-ai-setup{align-self:flex-start;color:var(--diamond);padding:2px 0}
+.ocr-edge-toggle{align-self:flex-start;color:var(--text-2);padding:2px 0}
+.ocr-edge-guide{border:2px solid var(--line);background:var(--surface-2);padding:10px 12px;font-size:11.5px;line-height:1.7;color:var(--text-3);box-shadow:var(--shadow-1)}
+.ocr-edge-guide ol{margin:6px 0 8px;padding-left:20px}
+.ocr-edge-guide li{margin:3px 0}
+.ocr-edge-guide kbd{display:inline-block;padding:0 4px;border:1px solid var(--line-3);background:var(--slot-bg);color:var(--text);font:10px var(--font-pixel);box-shadow:0 1px 0 rgba(0,0,0,.5)}
+.ocr-edge-note{margin:0;color:var(--text-2)}
+.ocr-edge-warn{margin:8px 0 0;color:var(--gold);font-size:11px}
+.ocr-edge-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ocr-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;border:2px solid var(--line);background:var(--surface-2);padding:8px 10px;box-shadow:var(--shadow-1)}
+.ocr-toolbar strong{display:block;font-size:13px;color:var(--text)}
+.ocr-toolbar span{display:block;margin-top:2px;font-size:11px;color:var(--text-3)}
+.ocr-run-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ocr-progress{height:14px;padding:2px;border:2px solid var(--line);background:var(--slot-bg)}
+.ocr-progress span{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,var(--xp) 0 6px,var(--xp-dark) 6px 8px);transition:width .2s ease}
+.ocr-text-field{display:flex;flex-direction:column;gap:5px;margin:0}
+.ocr-text-field>span{font-size:11px;color:var(--text-3);letter-spacing:.04em}
+.ocr-textarea{width:100%;min-height:148px;resize:vertical;line-height:1.7;font-size:13px;background:var(--slot-bg);border:2px solid var(--line);box-shadow:var(--shadow-1)}
+.ocr-suggest-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:2px}
+.ocr-suggest-head strong{font-size:12px;color:var(--text-2)}
+.ocr-suggest-head span{margin-left:8px;font-size:11px;color:var(--text-3)}
+.ocr-suggest-actions{display:flex;gap:8px}
+.ocr-suggestions{min-height:96px;max-height:260px;overflow:auto;padding:6px;border:2px solid var(--line);background:var(--surface-inset);box-shadow:inset 2px 2px 0 rgba(0,0,0,.5)}
+.ocr-task-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid var(--line-2)}
+.ocr-task-row:last-child{border-bottom:0}
+.ocr-task-row input[type="checkbox"]{width:18px;height:18px;flex:0 0 18px;accent-color:var(--grass)}
+.ocr-task-row input[type="text"]{flex:1;min-width:0;padding:5px 6px;border:1px solid transparent;background:transparent;color:var(--text);font:inherit;font-size:12.5px}
+.ocr-task-row input[type="text"]:focus{outline:none;border-color:var(--diamond);background:var(--slot-bg)}
+.ocr-task-row .ocr-task-index{width:20px;flex:0 0 20px;color:var(--text-4);font:11px var(--font-pixel);text-align:right}
+.ocr-suggestions .empty-inline{min-height:80px;display:flex;align-items:center;justify-content:center}
+.ocr-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ocr-import-options{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text-3)}
+.ocr-import-options .select{width:auto;min-width:190px}
+.ocr-foot-note{font-size:11px;color:var(--text-4)}
+.ocr-foot-actions{display:flex;gap:8px}
+@media(max-width:860px){
+  .ocr-layout{grid-template-columns:1fr;gap:14px}
+  .ocr-dropzone{min-height:150px}
+  .ocr-preview{max-height:170px}
+  .ocr-help{display:none}
+  .ocr-textarea{min-height:108px}
+  .ocr-modal{max-height:94dvh}
+  .ocr-modal .modal-body{padding-bottom:8px}
+  .ocr-suggestions{max-height:180px}
+}
+@media(max-width:560px){
+  .ocr-modal{width:100%;max-height:96dvh}
+  .ocr-source-actions .btn{flex:1}
+  .ocr-foot{align-items:stretch}
+  .ocr-foot-actions{justify-content:flex-end}
+  .ocr-import-options .select{min-width:0;flex:1}
+}
+html.is-static .ocr-progress span{transition:none}
+</style>
+</head>
+<body>
+<div class="ambient" aria-hidden="true">
+  <span class="ambient-glow ambient-glow-a"></span>
+  <span class="ambient-glow ambient-glow-b"></span>
+  <span class="ambient-glow ambient-glow-c"></span>
+  <span class="ambient-grid"></span>
+  <span class="ambient-noise"></span>
+</div>
+
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><use href="#i-craft"></use></svg>
+      </span>
+      <span class="brand-text">
+        <strong>方块清单</strong>
+        <small>CRAFT CHECK-IN</small>
+      </span>
+    </div>
+
+    <div class="sidebar-date" aria-hidden="true">
+      <span class="sidebar-weekday" id="sideWeekday">周五</span>
+      <span class="sidebar-day" id="sideDate">24</span>
+      <span class="sidebar-month" id="sideMonth">十月 · 2026</span>
+    </div>
+
+    <nav class="nav" aria-label="主导航">
+      <button class="nav-item is-active" data-view="today" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-craft"></use></svg>
+        <span class="nav-label">今日合成</span>
+        <span class="nav-count" id="navTodayCount">0</span>
+      </button>
+      <button class="nav-item" data-view="tasks" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-inventory"></use></svg>
+        <span class="nav-label">任务库</span>
+      </button>
+      <button class="nav-item" data-view="fire" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-book"></use></svg>
+        <span class="nav-label">合成记录</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-spacer"></div>
+
+    <div class="side-craft" id="sideEmber" data-state="lit">
+      <div class="mini-craft" aria-hidden="true">
+        <span class="mini-craft-top"></span>
+        <span class="mini-craft-body"></span>
+        <span class="mini-craft-grid"></span>
+      </div>
+      <div class="side-craft-text">
+        <span>连续合成</span>
+        <strong><span id="sideStreak">0</span> 天</strong>
+      </div>
+    </div>
+
+    <button class="side-settings" id="settingsBtn" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+      <span>设置与数据</span>
+    </button>
+    <p class="side-footnote">数据只保存在这台设备上</p>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-brand" id="mobileBrand" type="button" aria-label="回到今日">
+          <span class="mobile-brand-mark">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-craft"></use></svg>
+          </span>
+          <span>方块清单</span>
+        </button>
+        <div class="date-block">
+          <div class="date-line">
+            <span id="todayDate">10月24日 周五</span>
+            <span class="date-sep" aria-hidden="true"></span>
+            <span class="clock" id="todayTime">21:50</span>
+          </div>
+          <h1 class="greeting" id="greeting">晚上好，朋友</h1>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="header-streak" id="headerStreakPill" title="连续合成天数">
+          <svg class="icon streak-icon" aria-hidden="true"><use href="#i-pickaxe"></use></svg>
+          <span>连续</span>
+          <b id="headerStreak">0</b>
+          <span>天</span>
+        </div>
+
+        <button class="icon-btn" id="scanBtn" type="button" aria-label="扫描手写记事" title="扫描手写记事">
+          <svg class="icon" aria-hidden="true"><use href="#i-scan"></use></svg>
+        </button>
+
+        <div class="bell-wrap">
+          <button class="icon-btn" id="bellBtn" type="button" aria-label="查看提醒" aria-haspopup="dialog" aria-expanded="false">
+            <svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg>
+            <span class="badge-dot" id="bellBadge" hidden></span>
+          </button>
+          <div class="popover bell-popover" id="bellPopover" role="dialog" aria-label="今日提醒" hidden>
+            <div class="popover-head">
+              <strong>今日提醒</strong>
+              <span id="bellSubtitle">按提醒时间排序</span>
+            </div>
+            <div class="bell-list" id="bellList"></div>
+            <button class="popover-action" id="bellEnableBtn" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-spark"></use></svg>
+              <span id="bellEnableText">开启桌面通知</span>
+            </button>
+          </div>
+        </div>
+
+        <button class="icon-btn" id="themeBtn" type="button" aria-label="切换明暗主题" title="切换明暗主题">
+          <svg class="icon theme-icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+          <svg class="icon theme-icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
+        </button>
+
+        <button class="btn btn-primary btn-add" id="headerAddBtn" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+          <span>添加任务</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="view-stack">
+      <!-- ==================== 今日 ==================== -->
+      <section class="view" id="view-today" aria-labelledby="heroTitle">
+        <section class="hero" id="hero" data-state="lit">
+          <span class="hero-hairline" aria-hidden="true"></span>
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-dot"></span><span id="heroEyebrow">今日工作台</span></div>
+            <h2 class="hero-title" id="heroTitle">今日合成完成</h2>
+            <p class="hero-desc" id="heroDesc">连续合成 12 天，今天的配方全部就位。</p>
+
+            <div class="hero-stats">
+              <div class="hero-stat">
+                <strong id="heroStreak">0</strong>
+                <span>连续合成</span>
+              </div>
+              <div class="hero-stat">
+                <strong id="heroFuelCount">0/0</strong>
+                <span>配方材料</span>
+              </div>
+              <div class="hero-stat">
+                <strong id="heroDoneRate">0%</strong>
+                <span>今日进度</span>
+              </div>
+            </div>
+
+            <div class="hero-chips" id="heroChips" aria-label="合成配方材料"></div>
+
+            <div class="hero-cta">
+              <button class="btn btn-primary" id="heroAddBtn" type="button">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+                添加一个任务
+              </button>
+              <button class="btn btn-ghost" id="heroFuelBtn" type="button">调整合成配方</button>
+            </div>
+          </div>
+
+          <div class="craft-stage" id="craftStage" data-state="lit" aria-label="工作台状态：合成成功">
+            <div class="craft-panel">
+              <header class="craft-panel-bar">
+                <span class="craft-panel-title">
+                  <svg class="icon" aria-hidden="true"><use href="#i-craft"></use></svg>
+                  工作台
+                </span>
+                <span class="craft-state" id="craftStateText">合成成功</span>
+              </header>
+              <div class="craft-workspace">
+                <div class="craft-grid" id="craftGrid" role="group" aria-label="合成材料 3 × 3"></div>
+                <div class="craft-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><use href="#i-craft-arrow"></use></svg>
+                </div>
+                <div class="craft-output" id="craftOutputSlot">
+                  <span class="craft-output-label">产出</span>
+                  <span class="craft-result-item" id="craftResultItem">?</span>
+                  <span class="craft-result-name" id="craftResultName">等待材料</span>
+                </div>
+              </div>
+              <p class="craft-hint" id="craftHint">今天的配方材料都就位了</p>
+            </div>
+            <div class="craft-particles" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+          </div>
+        </section>
+
+        <div class="dashboard-grid">
+          <div class="dash-main">
+            <section class="card tasks-card" id="todayCard" aria-labelledby="todayCardTitle">
+              <header class="card-head">
+                <div>
+                  <div class="card-title-row">
+                    <h2 id="todayCardTitle">今日合成清单</h2>
+                    <span class="today-badge" id="todayBadge">0 项待办</span>
+                  </div>
+                  <p class="card-sub" id="todaySummary">新的一天，从摆一块材料开始。</p>
+                </div>
+                <div class="card-head-side">
+                  <div class="progress-ring" id="todayRing" style="--pct:0" aria-label="今日完成进度 0%">
+                    <span id="todayRingText">0%</span>
+                  </div>
+                </div>
+              </header>
+
+              <div class="segmented" id="todayFilters" role="tablist" aria-label="任务筛选">
+                <button class="segment is-active" data-filter="all" type="button" role="tab" aria-selected="true">全部</button>
+                <button class="segment" data-filter="daily" type="button" role="tab" aria-selected="false">每日</button>
+                <button class="segment" data-filter="extra" type="button" role="tab" aria-selected="false">额外</button>
+              </div>
+
+              <div class="task-list" id="todayTaskList"></div>
+
+              <div class="empty-state" id="todayEmpty" hidden>
+                <span class="empty-emoji" aria-hidden="true">🧱</span>
+                <h3>工作台还是空的</h3>
+                <p>先添加一件小事，让今天有材料可放。</p>
+                <button class="btn btn-primary" id="todayEmptyAdd" type="button">添加第一个任务</button>
+              </div>
+
+              <footer class="tasks-foot">
+                <button class="text-btn" id="todayCardAdd" type="button">
+                  <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+                  再添一项
+                </button>
+                <button class="text-btn" id="todayScan" type="button">
+                  <svg class="icon" aria-hidden="true"><use href="#i-scan"></use></svg>
+                  扫描手写
+                </button>
+                <button class="text-btn muted" id="todayManage" type="button">管理任务库</button>
+              </footer>
+            </section>
+          </div>
+
+          <aside class="dash-rail">
+            <section class="card recipe-card" aria-labelledby="fuelCardTitle">
+              <header class="card-head compact">
+                <div>
+                  <h2 id="fuelCardTitle">合成配方</h2>
+                  <p class="card-sub">集齐材料后自动产出</p>
+                </div>
+                <span class="mini-count" id="fuelCountBadge">0/0</span>
+              </header>
+              <div class="recipe-list" id="fuelList"></div>
+              <button class="text-btn full" id="manageFuelBtn" type="button">
+                <svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg>
+                选择配方材料
+              </button>
+            </section>
+
+            <section class="card reminder-card" aria-labelledby="reminderCardTitle">
+              <header class="card-head compact">
+                <div>
+                  <h2 id="reminderCardTitle">提醒</h2>
+                  <p class="card-sub">到点会轻轻叫你一下</p>
+                </div>
+                <span class="reminder-live"><span class="live-dot"></span>本机</span>
+              </header>
+              <div class="reminder-list" id="reminderList"></div>
+              <div class="reminder-foot">
+                <span id="reminderFootText">还没有开启提醒的任务</span>
+                <button class="text-btn" id="enableNotifyBtn" type="button">桌面通知</button>
+              </div>
+            </section>
+
+            <section class="card week-card" aria-labelledby="weekCardTitle">
+              <header class="card-head compact">
+                <div>
+                  <h2 id="weekCardTitle">本周合成</h2>
+                  <p class="card-sub" id="weekSub">周二 · 第 4 天</p>
+                </div>
+              </header>
+              <div class="week-stats" id="weekStats"></div>
+              <div class="week-mini-bars" id="weekBars" aria-hidden="true"></div>
+            </section>
+          </aside>
+        </div>
+
+        <p class="app-note">
+          <svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg>
+          所有数据只存储在本机浏览器，不上传、不需要账号。
+        </p>
+      </section>
+
+      <!-- ==================== 任务库 ==================== -->
+      <section class="view" id="view-tasks" hidden aria-labelledby="libraryTitle">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-dot"></span>RECIPE BOOK</div>
+            <h2 class="page-title" id="libraryTitle">任务库</h2>
+            <p class="page-sub">把生活里的常驻任务，整理成一张清楚的合成表。</p>
+          </div>
+          <button class="btn btn-primary" id="libraryAddBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+            新建任务
+          </button>
+        </div>
+
+        <div class="library-toolbar">
+          <label class="search-box">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input id="taskSearch" type="search" placeholder="搜索任务、分类或备注…" autocomplete="off" aria-label="搜索任务、分类或备注">
+          </label>
+          <div class="filter-chips" id="libraryFilters" role="tablist" aria-label="按周期筛选">
+            <button class="filter-chip is-active" data-filter="all" type="button" role="tab" aria-selected="true">全部</button>
+            <button class="filter-chip" data-filter="daily" type="button" role="tab" aria-selected="false">每日</button>
+            <button class="filter-chip" data-filter="weekly" type="button" role="tab" aria-selected="false">每周</button>
+            <button class="filter-chip" data-filter="monthly" type="button" role="tab" aria-selected="false">每月</button>
+            <button class="filter-chip" data-filter="interval" type="button" role="tab" aria-selected="false">每 X 天</button>
+            <button class="filter-chip" data-filter="urgent" type="button" role="tab" aria-selected="false">紧要</button>
+          </div>
+        </div>
+
+        <section class="card library-card">
+          <div class="library-list" id="libraryList"></div>
+          <div class="empty-state" id="libraryEmpty" hidden>
+            <span class="empty-emoji" aria-hidden="true">📦</span>
+            <h3>没有找到任务</h3>
+            <p id="libraryEmptyText">换个筛选条件，或新建一个任务。</p>
+            <button class="btn btn-primary" id="libraryEmptyAdd" type="button">新建任务</button>
+          </div>
+        </section>
+      </section>
+
+      <!-- ==================== 合成记录 ==================== -->
+      <section class="view" id="view-fire" hidden aria-labelledby="firePageTitle">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-dot"></span>CRAFT LOG</div>
+            <h2 class="page-title" id="firePageTitle">合成记录</h2>
+            <p class="page-sub">每一天，都是一次合成。材料可以慢慢凑，工作台一直在。</p>
+          </div>
+          <button class="btn btn-ghost" id="firePageAddFuelBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg>
+            调整配方
+          </button>
+        </div>
+
+        <div class="craft-page-grid">
+          <section class="card craft-hero-card" id="firePageHero" data-state="lit">
+            <div class="craft-hero-art" aria-hidden="true">
+              <div class="craft-page-table">
+                <div class="craft-page-slots" id="craftPageGrid"></div>
+                <div class="craft-page-arrow"><svg viewBox="0 0 24 24"><use href="#i-craft-arrow"></use></svg></div>
+                <div class="craft-page-output">
+                  <span class="craft-page-result" id="craftPageResultItem">?</span>
+                  <span class="craft-page-result-name" id="craftPageResultName">等待材料</span>
+                </div>
+              </div>
+            </div>
+            <div class="craft-hero-copy">
+              <span class="craft-state-label" id="firePageStateLabel">合成成功</span>
+              <div class="craft-big">
+                <strong id="firePageStreak">0</strong>
+                <span>天</span>
+              </div>
+              <p id="firePageStatus">今天的配方材料完成了。</p>
+              <div class="craft-metrics">
+                <div><span>最佳连续</span><strong id="firePageBest">0 天</strong></div>
+                <div><span>累计合成</span><strong id="firePageTotal">0 天</strong></div>
+                <div><span>近 30 天中断</span><strong id="firePageFrozen">0 天</strong></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card heatmap-card" aria-labelledby="heatmapTitle">
+            <header class="card-head compact">
+              <div>
+                <h2 id="heatmapTitle">最近 30 天</h2>
+                <p class="card-sub">每一格，都是工作台来过的证据</p>
+              </div>
+              <div class="heat-legend" aria-hidden="true">
+                <span class="heat-swatch is-lit"></span>已合成
+                <span class="heat-swatch is-frozen"></span>进行中
+                <span class="heat-swatch is-missed"></span>中断
+              </div>
+            </header>
+            <div class="heatmap" id="heatmap" role="img" aria-label="最近 30 天合成记录"></div>
+            <p class="heatmap-note" id="heatmapNote">从第一次合成开始记录。</p>
+          </section>
+
+          <section class="card recipe-page-card" aria-labelledby="fireFuelTitle">
+            <header class="card-head compact">
+              <div>
+                <h2 id="fireFuelTitle">合成配方</h2>
+                <p class="card-sub">可以多选。集齐后，工作台会自动产出。</p>
+              </div>
+              <span class="mini-count" id="fireFuelCount">0/0</span>
+            </header>
+            <div class="material-list" id="firePageFuelList"></div>
+            <button class="text-btn full" id="firePageManageFuel" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+              从任务库添加材料
+            </button>
+          </section>
+
+          <section class="card craft-stats-card" aria-labelledby="fireStatsTitle">
+            <header class="card-head compact">
+              <div>
+                <h2 id="fireStatsTitle">合成记录</h2>
+                <p class="card-sub">不追求满格，只记录真实</p>
+              </div>
+            </header>
+            <div class="craft-stat-grid" id="fireStats"></div>
+            <div class="craft-philosophy">
+              <svg class="icon" aria-hidden="true"><use href="#i-pickaxe"></use></svg>
+              <p>合成不是用来责备自己的。今天没凑齐材料，明天再挖一块。</p>
+            </div>
+          </section>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="移动端主导航">
+    <button class="mobile-nav-item is-active" data-view="today" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-craft"></use></svg>
+      <span>合成</span>
+    </button>
+    <button class="mobile-nav-item" data-view="tasks" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-inventory"></use></svg>
+      <span>任务库</span>
+    </button>
+    <button class="mobile-nav-add" id="mobileAddBtn" type="button" aria-label="添加任务">
+      <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+    </button>
+    <button class="mobile-nav-item" data-view="fire" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-book"></use></svg>
+      <span>记录</span>
+    </button>
+    <button class="mobile-nav-item" id="mobileSettingsNav" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+      <span>设置</span>
+    </button>
+  </nav>
+</div>
+
+<div class="toast-root" id="toastRoot" aria-live="polite" aria-atomic="false"></div>
+
+<div class="reminder-toast" id="reminderToast" role="alert" aria-live="assertive" hidden>
+  <div class="reminder-toast-glow" aria-hidden="true"></div>
+  <div class="reminder-toast-icon" aria-hidden="true">
+    <svg class="icon"><use href="#i-bell"></use></svg>
+  </div>
+  <div class="reminder-toast-body">
+    <span class="reminder-toast-kicker" id="reminderToastKicker">告示牌提醒</span>
+    <strong id="reminderToastTitle">该去合成材料了</strong>
+    <p id="reminderToastText">工作台还差这一块材料。</p>
+    <div class="reminder-toast-actions">
+      <button class="btn btn-primary btn-sm" id="reminderDoneBtn" type="button">完成了</button>
+      <button class="btn btn-ghost btn-sm" id="reminderSnoozeBtn" type="button">10 分钟后再提醒</button>
+      <button class="toast-dismiss" id="reminderDismissBtn" type="button" aria-label="关闭提醒">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-layer" id="modalRoot" hidden>
+  <div class="modal-backdrop" data-close-modal="1"></div>
+
+  <!-- 添加 / 编辑任务 -->
+  <div class="modal task-modal" id="taskModal" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle" hidden>
+    <div class="modal-accent" aria-hidden="true"></div>
+    <header class="modal-head">
+      <div>
+        <span class="eyebrow" id="taskModalKicker">NEW TASK</span>
+        <h2 id="taskModalTitle">添加任务</h2>
+      </div>
+      <button class="icon-btn modal-close" type="button" data-close-modal="1" aria-label="关闭">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+
+    <form id="taskForm" novalidate>
+      <div class="modal-body">
+        <div class="task-title-row">
+          <div class="emoji-preview" id="emojiPreview" aria-hidden="true">📖</div>
+          <div class="field grow">
+            <label for="taskTitle">任务名称</label>
+            <input class="input input-lg" id="taskTitle" type="text" maxlength="40" placeholder="例如：读书 30 分钟" autocomplete="off" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">选个图标</span>
+          <div class="emoji-picker" id="emojiPicker" role="group" aria-label="选择任务图标">
+            <button class="emoji-option is-active" type="button" data-emoji="📖" aria-label="书" aria-pressed="true">📖</button>
+            <button class="emoji-option" type="button" data-emoji="💧" aria-label="水" aria-pressed="false">💧</button>
+            <button class="emoji-option" type="button" data-emoji="🏃" aria-label="跑步" aria-pressed="false">🏃</button>
+            <button class="emoji-option" type="button" data-emoji="🧘" aria-label="冥想" aria-pressed="false">🧘</button>
+            <button class="emoji-option" type="button" data-emoji="✍️" aria-label="写作" aria-pressed="false">✍️</button>
+            <button class="emoji-option" type="button" data-emoji="🌱" aria-label="植物" aria-pressed="false">🌱</button>
+            <button class="emoji-option" type="button" data-emoji="🧹" aria-label="打扫" aria-pressed="false">🧹</button>
+            <button class="emoji-option" type="button" data-emoji="🧾" aria-label="账单" aria-pressed="false">🧾</button>
+            <button class="emoji-option" type="button" data-emoji="💊" aria-label="药物" aria-pressed="false">💊</button>
+            <button class="emoji-option" type="button" data-emoji="🎯" aria-label="目标" aria-pressed="false">🎯</button>
+            <button class="emoji-option" type="button" data-emoji="☎️" aria-label="电话" aria-pressed="false">☎️</button>
+            <button class="emoji-option" type="button" data-emoji="✨" aria-label="星星" aria-pressed="false">✨</button>
+            <input class="emoji-custom" id="emojiCustom" type="text" maxlength="4" placeholder="自定义" aria-label="自定义图标">
+          </div>
+        </div>
+
+        <div class="form-grid two">
+          <div class="field">
+            <label for="taskCategory">分类</label>
+            <input class="input" id="taskCategory" type="text" list="categoryList" maxlength="12" placeholder="成长" autocomplete="off">
+            <datalist id="categoryList">
+              <option value="健康"></option><option value="成长"></option><option value="生活"></option>
+              <option value="工作"></option><option value="关系"></option><option value="财务"></option>
+            </datalist>
+          </div>
+          <div class="field">
+            <span class="field-label">合成配方</span>
+            <label class="switch-line">
+              <input id="fireEnabled" type="checkbox" checked>
+              <span class="switch" aria-hidden="true"></span>
+              <span class="switch-text">完成后计入合成</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">刷新周期</span>
+          <div class="type-grid" id="typeGrid">
+            <label class="type-option">
+              <input type="radio" name="taskType" value="daily" checked>
+              <span class="type-card">
+                <span class="type-glyph" aria-hidden="true">🌱</span>
+                <strong>每日</strong>
+                <small>每天刷新</small>
+              </span>
+            </label>
+            <label class="type-option">
+              <input type="radio" name="taskType" value="weekly">
+              <span class="type-card">
+                <span class="type-glyph" aria-hidden="true">📦</span>
+                <strong>每周</strong>
+                <small id="weeklyHint">周一开始</small>
+              </span>
+            </label>
+            <label class="type-option">
+              <input type="radio" name="taskType" value="monthly">
+              <span class="type-card">
+                <span class="type-glyph" aria-hidden="true">🌙</span>
+                <strong>每月</strong>
+                <small>按月刷新</small>
+              </span>
+            </label>
+            <label class="type-option">
+              <input type="radio" name="taskType" value="interval">
+              <span class="type-card">
+                <span class="type-glyph" aria-hidden="true">🧭</span>
+                <strong>每 X 天</strong>
+                <small>自定义间隔</small>
+              </span>
+            </label>
+            <label class="type-option">
+              <input type="radio" name="taskType" value="urgent">
+              <span class="type-card">
+                <span class="type-glyph" aria-hidden="true">⚡</span>
+                <strong>紧要</strong>
+                <small>一次性截止</small>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="conditional-fields">
+          <div class="field conditional" id="fieldWeekly" hidden>
+            <div class="hint-box">
+              <svg class="icon" aria-hidden="true"><use href="#i-repeat"></use></svg>
+              <p id="weeklyHintText">每周任务以自然周为周期，完成一次后本周自动打勾，下周一重新出现。</p>
+            </div>
+          </div>
+
+          <div class="field conditional" id="fieldMonthly" hidden>
+            <label for="monthday">每月哪一天刷新</label>
+            <select class="input select" id="monthday"></select>
+            <p class="field-hint">遇到没有这一天的月份，会自动归到月末。</p>
+          </div>
+
+          <div class="form-grid two conditional" id="fieldInterval" hidden>
+            <div class="field">
+              <label for="everyN">每隔多少天</label>
+              <div class="input-with-suffix">
+                <input class="input" id="everyN" type="number" min="2" max="365" value="3" inputmode="numeric">
+                <span>天</span>
+              </div>
+            </div>
+            <div class="field">
+              <label for="anchor">从哪天开始</label>
+              <input class="input" id="anchor" type="date">
+            </div>
+          </div>
+
+          <div class="conditional" id="fieldUrgent" hidden>
+            <div class="form-grid three">
+              <div class="field">
+                <label for="dueDate">截止日期</label>
+                <input class="input" id="dueDate" type="date">
+              </div>
+              <div class="field">
+                <label for="dueTime">截止时间</label>
+                <input class="input" id="dueTime" type="time" value="18:00">
+              </div>
+              <div class="field">
+                <label for="priority">紧要程度</label>
+                <select class="input select" id="priority">
+                  <option value="high">很紧要</option>
+                  <option value="normal" selected>普通</option>
+                  <option value="low">还好</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-grid two">
+          <div class="field">
+            <span class="field-label">定时提醒</span>
+            <div class="reminder-editor">
+              <label class="switch-line">
+                <input id="reminderEnabled" type="checkbox">
+                <span class="switch" aria-hidden="true"></span>
+                <span class="switch-text">到点提醒</span>
+              </label>
+              <input class="input input-time" id="reminderTime" type="time" value="21:00" aria-label="提醒时间">
+            </div>
+            <p class="field-hint">当天未完成时，到点提醒一次。</p>
+          </div>
+          <div class="field">
+            <label for="taskNotes">备注（可选）</label>
+            <input class="input" id="taskNotes" type="text" maxlength="80" placeholder="给自己的一句话">
+          </div>
+        </div>
+
+        <p class="form-error" id="taskFormError" role="alert" hidden></p>
+      </div>
+
+      <footer class="modal-foot">
+        <button class="btn btn-ghost" type="button" data-close-modal="1">取消</button>
+        <button class="btn btn-primary" type="submit" id="taskSaveBtn">保存任务</button>
+      </footer>
+    </form>
+  </div>
+
+  <!-- OCR 扫描手写记事 -->
+  <div class="modal ocr-modal" id="ocrModal" role="dialog" aria-modal="true" aria-labelledby="ocrTitle" hidden>
+    <header class="modal-head">
+      <div>
+        <span class="eyebrow">SCAN TO CRAFT</span>
+        <h2 id="ocrTitle">扫描手写记事</h2>
+      </div>
+      <button class="icon-btn modal-close" type="button" data-close-modal="1" aria-label="关闭">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+
+    <div class="modal-body ocr-body">
+      <div class="ocr-layout">
+        <section class="ocr-source">
+          <div class="ocr-dropzone" id="ocrDropzone" tabindex="0" role="button" aria-label="选择或拖入一张手写记事照片">
+            <input class="visually-hidden" id="ocrFile" type="file" accept="image/*" aria-label="选择手写记事照片" tabindex="-1">
+            <input class="visually-hidden" id="ocrCamera" type="file" accept="image/*" capture="environment" aria-label="拍摄手写记事" tabindex="-1">
+            <div class="ocr-empty" id="ocrEmpty">
+              <svg class="icon ocr-empty-icon" aria-hidden="true"><use href="#i-scan"></use></svg>
+              <strong>拍照 / 上传 / 拖入</strong>
+              <p>尽量正对纸张、光线均匀，字迹清晰。也可以在右侧直接粘贴或输入文字。</p>
+            </div>
+            <img class="ocr-preview" id="ocrPreview" alt="待识别的手写记事" hidden>
+          </div>
+          <div class="ocr-source-actions">
+            <button class="btn btn-ghost btn-sm" id="ocrPickBtn" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-scan"></use></svg>
+              选择图片
+            </button>
+            <button class="btn btn-ghost btn-sm" id="ocrCameraBtn" type="button">拍照</button>
+            <button class="btn btn-ghost btn-sm" id="ocrClearImage" type="button">清除</button>
+          </div>
+          <p class="ocr-help" id="ocrEngineHelp">支持 JPG / PNG / WebP。当前使用本地 OCR（适合印刷体）；可在设置里启用 AI 手写识别。识别结果可校对后再加入。</p>
+          <button class="text-btn ocr-ai-setup" id="ocrAiSetupBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-spark"></use></svg>
+            启用 AI 手写识别
+          </button>
+          <button class="text-btn ocr-edge-toggle" id="ocrEdgeGuideBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-scan"></use></svg>
+            用 Edge 自带 OCR 提取文字
+          </button>
+          <div class="ocr-edge-guide" id="ocrEdgeGuide" hidden>
+            <p class="ocr-edge-note">网页 JavaScript 不能直接调用 Edge 的 OCR；可以用 Edge「网页捕获」提取后粘贴：</p>
+            <ol>
+              <li>点「在 Edge 打开图片」，或直接在原图页面按 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> 打开网页捕获。</li>
+              <li>框选记事区域，在捕获工具栏点「复制文本」（没有该按钮时请用系统截图工具的文字提取）。</li>
+              <li>回到这里按 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴，或点「从剪贴板粘贴」。</li>
+            </ol>
+            <div class="ocr-edge-actions">
+              <button class="btn btn-ghost btn-sm" id="ocrOpenImageBtn" type="button">在 Edge 打开图片</button>
+              <button class="btn btn-ghost btn-sm" id="ocrPasteTextBtn" type="button">从剪贴板粘贴</button>
+            </div>
+            <p class="ocr-edge-warn">Edge 的 OCR 对连笔手写也不一定准确；识别后请务必校对。</p>
+          </div>
+        </section>
+
+        <section class="ocr-work">
+          <div class="ocr-toolbar">
+            <div>
+              <strong id="ocrStatus">等待图片</strong>
+              <span id="ocrSubstatus">上传或拍一张手写记事</span>
+            </div>
+            <div class="ocr-run-actions">
+              <button class="btn btn-ghost btn-sm" id="ocrLocalBtn" type="button" hidden>本地识别</button>
+              <button class="btn btn-primary btn-sm" id="ocrRunBtn" type="button" disabled>识别文字</button>
+            </div>
+          </div>
+          <div class="ocr-progress" id="ocrProgress" hidden aria-hidden="true"><span id="ocrProgressBar"></span></div>
+
+          <label class="field ocr-text-field" for="ocrText">
+            <span>识别结果（可校对）</span>
+            <textarea class="input ocr-textarea" id="ocrText" rows="7" placeholder="识别结果会出现在这里；也可以直接粘贴或输入文字。每行一件待办。"></textarea>
+          </label>
+
+          <div class="ocr-suggest-head">
+            <div><strong>拆分为待办</strong><span id="ocrCount">0 项</span></div>
+            <div class="ocr-suggest-actions">
+              <button class="text-btn" id="ocrSelectAll" type="button">全选</button>
+              <button class="text-btn" id="ocrSelectNone" type="button">取消全选</button>
+            </div>
+          </div>
+          <div class="ocr-suggestions" id="ocrSuggestions">
+            <div class="empty-inline"><p>识别或输入文字后，这里会出现待办列表。</p></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <footer class="modal-foot ocr-foot">
+      <div class="ocr-import-options">
+        <label for="ocrImportMode">加入方式</label>
+        <select class="input select" id="ocrImportMode">
+          <option value="today" selected>今日一次（截止今天）</option>
+          <option value="daily">每日任务</option>
+        </select>
+        <span class="ocr-foot-note">默认不计入合成配方</span>
+      </div>
+      <div class="ocr-foot-actions">
+        <button class="btn btn-ghost" type="button" data-close-modal="1">取消</button>
+        <button class="btn btn-primary" id="ocrImportBtn" type="button" disabled>加入今日</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 设置 -->
+  <div class="modal settings-modal" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <header class="modal-head">
+      <div>
+        <span class="eyebrow">PREFERENCES</span>
+        <h2 id="settingsTitle">设置与数据</h2>
+      </div>
+      <button class="icon-btn modal-close" type="button" data-close-modal="1" aria-label="关闭">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+
+    <div class="modal-body">
+      <section class="settings-section">
+        <h3>你希望怎么被称呼</h3>
+        <div class="form-grid two">
+          <div class="field">
+            <label for="userName">昵称</label>
+            <input class="input" id="userName" type="text" maxlength="16" placeholder="朋友">
+          </div>
+          <div class="field">
+            <label for="weekStartSelect">一周从哪天开始</label>
+            <select class="input select" id="weekStartSelect">
+              <option value="1">周一</option>
+              <option value="7">周日</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">主题</span>
+          <div class="theme-choices" id="themeChoices" role="group" aria-label="主题">
+            <button class="theme-choice" data-theme-choice="dark" type="button">
+              <span class="theme-preview theme-preview-dark" aria-hidden="true"></span>
+              <span>洞穴夜色</span>
+            </button>
+            <button class="theme-choice" data-theme-choice="light" type="button">
+              <span class="theme-preview theme-preview-light" aria-hidden="true"></span>
+              <span>平原白昼</span>
+            </button>
+          </div>
+        </div>
+
+        <label class="switch-line settings-switch">
+          <input id="soundEnabled" type="checkbox" checked>
+          <span class="switch" aria-hidden="true"></span>
+          <span class="switch-text">提醒与合成成功时播放轻提示音</span>
+        </label>
+      </section>
+
+      <section class="settings-section">
+        <h3>桌面提醒</h3>
+        <p class="settings-text" id="notifyStatus">浏览器通知尚未开启。开启后，即使页面在后台也能收到提醒。</p>
+        <button class="btn btn-ghost" id="notifyPermissionBtn" type="button">开启桌面通知</button>
+      </section>
+
+      <section class="settings-section" id="aiOcrSection">
+        <h3>AI 手写识别（DeepSeek 直连）</h3>
+        <p class="settings-text">浏览器直接调用 DeepSeek，不需要后端、不需要启动脚本。Key 以混淆形式内置为默认值；照片会发送给 DeepSeek。分享/上传 HTML 前请先清空 Key。</p>
+        <label class="switch-line settings-switch">
+          <input id="aiOcrEnabled" type="checkbox">
+          <span class="switch" aria-hidden="true"></span>
+          <span class="switch-text">启用 AI 手写识别</span>
+        </label>
+        <div class="form-grid two">
+          <div class="field">
+            <label for="aiOcrKey">API Key</label>
+            <input class="input" id="aiOcrKey" type="password" autocomplete="off" placeholder="sk-...">
+          </div>
+          <div class="field">
+            <label for="aiOcrModel">模型</label>
+            <input class="input" id="aiOcrModel" type="text" autocomplete="off" value="deepseek-flash">
+          </div>
+        </div>
+        <p class="field-hint">Base 固定为 <code>https://api.deepseek.com</code>；DeepSeek 允许浏览器跨域。Key 在输入时自动保存，刷新不丢。</p>
+      </section>
+
+      <section class="settings-section">
+        <h3>数据</h3>
+        <p class="settings-text">方块清单完全离线运行；只有启用 AI 识别时才会把扫描图片发送给 DeepSeek。记得偶尔导出备份，尤其是清理浏览器数据之前。</p>
+        <div class="data-actions">
+          <button class="btn btn-ghost btn-sm" id="exportBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>
+            导出备份
+          </button>
+          <button class="btn btn-ghost btn-sm" id="importBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>
+            导入备份
+          </button>
+          <input class="visually-hidden" id="importFile" type="file" accept="application/json,.json" aria-label="选择要导入的备份文件">
+          <button class="btn btn-ghost btn-sm" id="demoDataBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-spark"></use></svg>
+            载入示例数据
+          </button>
+          <button class="btn btn-danger-ghost btn-sm" id="resetDataBtn" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
+            清空全部数据
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <footer class="modal-foot">
+      <span class="modal-foot-note">数据版本 1 · 仅本机</span>
+      <button class="btn btn-primary" type="button" data-close-modal="1">完成</button>
+    </footer>
+  </div>
+
+  <!-- 通用确认 -->
+  <div class="modal confirm-modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+    <header class="modal-head">
+      <div>
+        <span class="eyebrow">PLEASE CONFIRM</span>
+        <h2 id="confirmTitle">确认操作</h2>
+      </div>
+      <button class="icon-btn modal-close" type="button" data-close-modal="1" aria-label="关闭">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+    <div class="modal-body">
+      <p class="confirm-text" id="confirmText">这个操作无法撤销。</p>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-close-modal="1">取消</button>
+      <button class="btn btn-danger" type="button" id="confirmOk">确定</button>
+    </footer>
+  </div>
+</div>
+
+<pre id="selftest-result" hidden></pre>
+
+<!-- 图标库 + 方块图标 -->
+<svg class="svg-defs" aria-hidden="true" width="0" height="0" focusable="false">
+  <defs>
+    <symbol id="i-scan" viewBox="0 0 24 24">
+      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+      <rect x="8" y="7" width="8" height="10" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.3" d="M10 10h4M10 13h4"/>
+    </symbol>
+    <symbol id="i-craft" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M3 3h18v4H3z"/>
+      <path fill="currentColor" opacity=".72" d="M3 7h18v10H3z"/>
+      <path fill="#181008" d="M4 8h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/>
+      <path fill="currentColor" d="M4 17h3v4H4zm13 0h3v4h-3z"/>
+    </symbol>
+    <symbol id="i-inventory" viewBox="0 0 24 24">
+      <rect x="3" y="6" width="18" height="14" fill="currentColor" opacity=".55"/>
+      <path fill="currentColor" d="M3 5h18v4H3zm0 11h18v4H3z"/>
+      <path fill="#181008" d="M4 6h16v3H4z"/>
+      <rect x="10" y="11" width="4" height="5" fill="#181008"/>
+      <circle cx="12" cy="13" r="1" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-book" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M4 3h16v18H4z" opacity=".55"/>
+      <path fill="currentColor" d="M5 4h6v16H5zm8 0h6v16h-6z"/>
+      <path fill="#181008" d="M8 4h1v16H8zm7 0h1v16h-1z"/>
+    </symbol>
+    <symbol id="i-pickaxe" viewBox="0 0 24 24">
+      <path fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" d="M5 20.5 16.5 9"/>
+      <path fill="currentColor" d="M8 2.5c5.3.7 9.3 4 12.5 8.1l-2.6 2.4-3.7-1.2-2.6-2.6-1.3-3.7z"/>
+    </symbol>
+    <symbol id="i-diamond" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M7 3h10l4 5-9 13L3 8z"/>
+      <path fill="#fff" opacity=".45" d="M7 3 3 8h6zM17 3l4 5h-6zM9 8h6l-3 9z"/>
+    </symbol>
+    <symbol id="i-craft-arrow" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M3 9h9V5l9 7-9 7v-4H3z"/>
+    </symbol>
+    <symbol id="i-grass" viewBox="0 0 24 24">
+      <path fill="#5f9137" d="M3 3h18v7H3z"/>
+      <path fill="#744a2b" d="M3 10h18v11H3z"/>
+      <path fill="#81b84e" d="M3 3h6v3H3zm9 0h7v3h-7zM5 8h10v2H5zm13 0h3v2h-3z"/>
+    </symbol>
+    <symbol id="i-today" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m8.2 14.6 2.4 2.4 5-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tasks" viewBox="0 0 24 24"><path d="M9.5 6h10M9.5 12h10M9.5 18h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m3.5 6 1.3 1.3L7.5 4.6M3.5 12l1.3 1.3L7.5 10.6M3.5 18l1.3 1.3L7.5 16.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 6.5-2.5 7.5h17C20 15.5 18 15 18 9z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9.8 20a2.4 2.4 0 0 0 4.4 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.7 2.7-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-3.8v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.6 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3.2v-3.8h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.6 7l2.7-2.7.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.2h3.8v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v3.8H21a1.7 1.7 0 0 0-1.6 1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.2 14.4A8.5 8.5 0 0 1 9.6 3.8a8.5 8.5 0 1 0 10.6 10.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.4 4.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.6 4.6L19 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.5V12l3 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 9a5 5 0 0 1 5-5h7M20 15a5 5 0 0 1-5 5H8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m14 2 2.5 2.5L14 7M10 17l-2.5 2.5L10 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v5M12 17.2v.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l4.2-1 10.3-10.3a2.8 2.8 0 0 0-4-4L4.2 15 4 20z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v11M7.5 10l4.5 4.5L16.5 10M4 19.5h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8 12 3.5 16.5 8M4 19.5h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2.5c.9 5 2.6 6.7 7.5 7.5-4.9.9-6.6 2.6-7.5 7.5-.9-4.9-2.6-6.6-7.5-7.5 4.9-.8 6.6-2.5 7.5-7.5zM19 16c.4 2 1.1 2.7 3 3-1.9.4-2.6 1.1-3 3-.4-1.9-1.1-2.6-3-3 1.9-.3 2.6-1 3-3z" fill="currentColor"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10" width="15" height="10.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15.2" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></symbol>
+  </defs>
+</svg>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
