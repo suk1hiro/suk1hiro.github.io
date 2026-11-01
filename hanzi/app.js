@@ -261,7 +261,12 @@
   speakBtn.onclick = function () {
     var it = currentList[currentIndex];
     if (!it) return;
+    var rec = HANZI[it.c] || {};
     cancelSpeech();
+    if (rec.wordPinyin) {
+      var hints = pickHintWords(rec.words, it.c, 1, rec.wordPinyin, it.p || '');
+      if (hints.length) { speak(hints[0]); return; }
+    }
     speak(it.c);
   };
   prevBtn.onclick = function () { openChar(currentIndex - 1); };
@@ -537,9 +542,25 @@
     return word.split(ch).join(py);
   }
 
-  function pickHintWords(words, ch, n) {
+  function normPinyin(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/u:/g, 'ü').replace(/v/g, 'ü').replace(/\s+/g, '');
+  }
+
+  function pickHintWords(words, ch, n, wordPinyin, targetPinyin) {
     if (!words || !words.length) return [];
     var valid = words.filter(function (w) { return typeof w === 'string' && w.indexOf(ch) >= 0; });
+
+    // For polyphonic characters, keep only words that use the target reading.
+    if (wordPinyin && targetPinyin) {
+      var target = normPinyin(targetPinyin);
+      var matched = valid.filter(function (w) {
+        var wp = wordPinyin[w];
+        return wp && normPinyin(wp) === target;
+      });
+      if (matched.length) valid = matched;
+    }
+
     if (valid.length <= n) return valid.slice();
 
     // Prefer 2-character words; only fall back to longer words/phrases if needed.
@@ -558,16 +579,19 @@
     return out;
   }
 
-  function speakHints(char, hints) {
+  function speakHints(char, hints, skipChar) {
     cancelSpeech();
-    var text = char || '';
+    var text = '';
     if (hints && hints.length) {
-      text += '，' + hints.join('，');
+      text = hints.join('，');
+      if (!skipChar) text = char + '，' + text;
+    } else {
+      text = char || '';
     }
     speak(text);
   }
 
-  function renderHint(it, hints, py) {
+  function renderHint(it, hints, py, wordPinyin) {
     fcHint.innerHTML = '';
     if (!hints || !hints.length) {
       fcHint.className = 'fc-hint empty';
@@ -580,9 +604,10 @@
     title.textContent = '提示';
     fcHint.appendChild(title);
     hints.forEach(function (w) {
+      var wpy = (wordPinyin && wordPinyin[w]) ? wordPinyin[w] : py;
       var span = document.createElement('span');
       span.className = 'fc-word';
-      span.textContent = maskWord(w, it.c, py);
+      span.textContent = maskWord(w, it.c, wpy);
       fcHint.appendChild(span);
     });
   }
@@ -600,14 +625,16 @@
     fcMeta.textContent = [it.p || '', it.unit || '', it.lesson || '',
       rec.strokeCount ? rec.strokeCount + '画' : ''].filter(Boolean).join(' · ');
     var py = it.p || '';
-    var hints = pickHintWords(rec.words, it.c, 3);
-    renderHint(it, hints, py);
+    var wordPinyin = rec.wordPinyin || null;
+    var isPolyphonic = !!wordPinyin;
+    var hints = pickHintWords(rec.words, it.c, 3, wordPinyin, py);
+    renderHint(it, hints, py, wordPinyin);
     testPos.textContent = (testState.index + 1) + ' / ' + testState.cards.length;
     testPrev.disabled = testState.index <= 0;
     testNext.disabled = testState.index >= testState.cards.length - 1;
     fcReplay.disabled = !('speechSynthesis' in window) || !hints.length;
     testState.speakTimer = setTimeout(function () {
-      speakHints(it.c, hints);
+      speakHints(it.c, hints, isPolyphonic);
     }, 220);
   }
 
@@ -670,8 +697,10 @@
     var it = testState.cards[testState.index];
     if (!it) return;
     var rec = HANZI[it.c] || {};
-    var hints = pickHintWords(rec.words, it.c, 3);
-    speakHints(it.c, hints);
+    var py = it.p || '';
+    var wordPinyin = rec.wordPinyin || null;
+    var hints = pickHintWords(rec.words, it.c, 3, wordPinyin, py);
+    speakHints(it.c, hints, !!wordPinyin);
   };
   testPrev.onclick = function () {
     if (testState.index > 0) { testState.index--; renderTestCard(); }

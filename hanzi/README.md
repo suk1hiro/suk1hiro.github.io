@@ -14,6 +14,8 @@
   - 选择单元（上/下册分开显示），可保持教材顺序或随机顺序。
   - 闪卡正面显示拼音 + 若干提示词；提示词中目标字会被替换成拼音，目标字可以在词语的任意位置，提示词也包含成语。
   - 提示词优先使用 2 字词语；2 字词语不足时才会使用更长的词语或成语。
+  - 多音字会按当前课文读音筛选提示词，避免出现“长（cháng）”却给“长辈（zhǎng）”这类不一致。
+  - 多音字朗读时优先读包含该读音的词语，避免孤立朗读时读错读音。
   - 朗读时读出目标汉字和提示词原文（不会读拼音）。
   - 点击卡片或按空格翻面，查看汉字并自动播放笔顺。
   - 支持键盘 ←/→ 切换卡片、R 重读提示。
@@ -35,7 +37,7 @@ styles.css            样式（含田字格、闪卡）
 app.js                交互逻辑
 vendor/hanzi-writer.min.js   Hanzi Writer 3.7.3（本地，离线可用）
 data/characters.js    window.CHAR_DATA：册 → 单元 → 课文 → [{c,p}]
-data/hanzi.js         window.HANZI_DATA：字 → {strokes,medians,radStrokes,words}
+data/hanzi.js         window.HANZI_DATA：字 → {strokes,medians,radStrokes,words,wordPinyin}
 data/hanzi_cache.json 单字缓存汇总（构建时生成，便于部署）
 tools/build_data.py   一次性抓取/生成脚本
 tools/enrich_words.py 用 CC-CEDICT + 成语扩充提示词
