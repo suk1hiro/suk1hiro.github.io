@@ -3,218 +3,441 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>热门头条展示</title>
-    <link rel="stylesheet" href="../styles.css"> <!-- External stylesheet -->
+    <title>热门头条自动搜索</title>
+    <style>
+        :root {
+            --bg-1: #0f1226;
+            --bg-2: #1a1f3a;
+            --card: rgba(255, 255, 255, 0.06);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text: #e8eaf6;
+            --text-dim: #9aa0c3;
+            --accent: #6c8cff;
+            --accent-2: #38d1c0;
+            --danger: #ff6b81;
+            --radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+            background:
+                radial-gradient(1200px 600px at 80% -10%, rgba(108, 140, 255, 0.18), transparent 60%),
+                radial-gradient(900px 500px at 0% 110%, rgba(56, 209, 192, 0.12), transparent 60%),
+                linear-gradient(160deg, var(--bg-1), var(--bg-2));
+            color: var(--text);
+            min-height: 100vh;
+            padding: 32px 20px;
+        }
+
+        .container { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+        header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.5px; }
+        h1 span {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 14px; border-radius: 999px;
+            background: var(--card); border: 1px solid var(--card-border);
+            font-size: 0.85rem; color: var(--text-dim);
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+        .dot.running { background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2); animation: pulse 1.4s infinite; }
+        @keyframes pulse { 50% { opacity: 0.4; } }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 22px;
+            backdrop-filter: blur(12px);
+        }
+
+        .controls { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto auto; gap: 12px; align-items: end; }
+        @media (max-width: 720px) { .controls { grid-template-columns: 1fr 1fr; } }
+
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { font-size: 0.78rem; color: var(--text-dim); letter-spacing: 0.4px; }
+
+        select, input {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--card-border);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.92rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.2); }
+        select option { background: var(--bg-2); color: var(--text); }
+
+        .btn {
+            border: none; border-radius: 10px; padding: 11px 20px;
+            font-size: 0.92rem; font-weight: 600; cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+            white-space: nowrap;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #8a6cff);
+            color: #fff; box-shadow: 0 6px 18px rgba(108, 140, 255, 0.35);
+        }
+        .btn-primary:hover:not(:disabled) { box-shadow: 0 8px 24px rgba(108, 140, 255, 0.5); }
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text); border: 1px solid var(--card-border);
+        }
+        .btn-ghost:hover:not(:disabled) { background: rgba(255, 107, 129, 0.15); border-color: var(--danger); }
+
+        .progress-row { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+        .progress-bar { flex: 1; height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+        .progress-fill {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            border-radius: 999px; transition: width 0.4s ease;
+        }
+        .progress-text { font-size: 0.82rem; color: var(--text-dim); min-width: 130px; text-align: right; font-variant-numeric: tabular-nums; }
+
+        h2 { font-size: 1rem; font-weight: 600; color: var(--text-dim); margin-bottom: 14px; letter-spacing: 0.4px; }
+
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip {
+            padding: 7px 13px; border-radius: 999px; font-size: 0.83rem;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid var(--card-border);
+            color: var(--text);
+            transition: background 0.2s, border-color 0.2s, transform 0.2s;
+            cursor: default;
+        }
+        .chip:hover { transform: translateY(-1px); }
+        .chip.done { background: rgba(56, 209, 192, 0.15); border-color: rgba(56, 209, 192, 0.5); color: var(--accent-2); }
+        .chip.current { background: rgba(108, 140, 255, 0.2); border-color: var(--accent); box-shadow: 0 0 10px rgba(108, 140, 255, 0.35); }
+        .placeholder { color: var(--text-dim); font-size: 0.88rem; }
+
+        .log {
+            margin-top: 14px; max-height: 160px; overflow-y: auto;
+            font-family: Consolas, "Courier New", monospace; font-size: 0.78rem;
+            color: var(--text-dim); line-height: 1.7;
+        }
+        .log div { border-bottom: 1px dashed rgba(255, 255, 255, 0.05); padding: 2px 0; }
+        .log .ok { color: var(--accent-2); }
+        .log .warn { color: #ffc46b; }
+
+        .log::-webkit-scrollbar, body::-webkit-scrollbar { width: 8px; }
+        .log::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+    </style>
     <script>
-        // Store window handles
+        // ---- 全局状态 ----
+        let searchTimerId = null;       // 下一次搜索的 setTimeout 句柄
+        let running = false;            // 是否正在自动搜索
+        let sessionKeywords = [];       // 本次会话的搜索词（已随机化处理）
+        let sessionIndex = 0;           // 当前进度
         let openedWindows = [];
-        let currentIntervalId = null; // Store current timer ID
 
-        // Helper function to close window
+        // ---- 工具函数 ----
+        function log(text, cls = '') {
+            const box = document.getElementById('logBox');
+            const time = new Date().toTimeString().slice(0, 8);
+            const line = document.createElement('div');
+            if (cls) line.className = cls;
+            line.textContent = `[${time}] ${text}`;
+            box.prepend(line);
+            while (box.children.length > 60) box.removeChild(box.lastChild);
+        }
+
         function closeWindow(win) {
-            try {
-                if (win && !win.closed) {
-                    win.close();
-                    console.log('成功关闭窗口');
-                } else {
-                    console.log('窗口已经关闭或无效');
-                }
-            } catch (error) {
-                console.error('关闭窗口时出错:', error);
-            }
+            try { if (win && !win.closed) win.close(); } catch (e) { /* ignore */ }
         }
 
-        // Function to close all windows
         function closeAllWindows() {
-            console.log('开始关闭所有窗口，当前窗口数量:', openedWindows.length);
-            openedWindows.forEach(win => {
-                closeWindow(win);
-            });
+            openedWindows.forEach(closeWindow);
             openedWindows = [];
-            console.log('已清空窗口句柄数组');
         }
 
-        // Function to stop search
-        function stopSearch() {
-            if (currentIntervalId) {
-                clearInterval(currentIntervalId);
-                currentIntervalId = null;
-                console.log('已停止搜索');
+        // Fisher-Yates 洗牌
+        function shuffle(arr) {
+            const a = arr.slice();
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
             }
+            return a;
+        }
+
+        // 取 [min, max] 之间偏中间的随机值（两次随机取平均，模拟人类作息分布）
+        function randomMid(min, max) {
+            return (Math.random() * (max - min) + min + Math.random() * (max - min) + min) / 2;
+        }
+
+        // ---- 热词来源 ----
+        const HOT_SOURCES = {
+            weibo:     { name: '微博热搜',   url: 'https://v2.xxapi.cn/api/weibohot',     pick: d => d.data.map(x => x.title) },
+            baidu:     { name: '百度热搜',   url: 'https://v2.xxapi.cn/api/baiduhot',     pick: d => d.data.map(x => x.title) },
+            csdn:      { name: 'CSDN 热榜',  url: 'https://v2.xxapi.cn/api/csdnhot',      pick: d => d.data.map(x => x.title) },
+            douyin:    { name: '抖音热榜',   url: 'https://v2.xxapi.cn/api/douyinhot',    pick: d => d.data.map(x => x.word) },
+            bilibili:  { name: 'B 站热榜',   url: 'https://v2.xxapi.cn/api/bilibilihot',  pick: d => d.data },
+            hackernews: {
+                name: 'Hacker News',
+                url: 'https://hacker-news.firebaseio.com/v0/topstories.json',
+                pick: null // 单独处理
+            },
+            googlenews: {
+                name: 'Google News',
+                url: 'https://gnews.io/api/v4/top-headlines?lang=en&country=us&max=30&apikey=043834870d8b9c4c55af4ebebaa197ad',
+                pick: d => d.articles.map(x => x.title)
+            }
+        };
+
+        async function fetchKeywords(source) {
+            const cfg = HOT_SOURCES[source];
+            if (!cfg) return [];
+            if (source === 'hackernews') {
+                const ids = await (await fetch(cfg.url)).json();
+                const top = shuffle(ids).slice(0, 25);
+                return Promise.all(top.map(async id => {
+                    const s = await (await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)).json();
+                    return s.title;
+                }));
+            }
+            const data = await (await fetch(cfg.url)).json();
+            return cfg.pick(data);
+        }
+
+        // ---- 拟人化搜索 ----
+
+        // 偶尔给搜索词追加一个自然的后缀，模拟真实用户的延伸搜索
+        const CN_SUFFIX = ['', '', '', '是什么', '最新消息', '怎么回事', '是什么意思', '新闻'];
+        const EN_SUFFIX = ['', '', '', ' news', ' explained', ' meaning', ' 2026'];
+
+        function humanizeQuery(keyword) {
+            const isCJK = /[\u4e00-\u9fff]/.test(keyword);
+            const pool = isCJK ? CN_SUFFIX : EN_SUFFIX;
+            return keyword + pool[Math.floor(Math.random() * pool.length)];
+        }
+
+        // 随机挑选一个真实来源参数，避免每次 URL 特征完全一致
+        const FORM_PARAMS = ['QBLH', 'EDGSPH', 'HPNN', 'SERC', ''];
+        function randomForm() {
+            return FORM_PARAMS[Math.floor(Math.random() * FORM_PARAMS.length)];
+        }
+
+        function openSearch(query) {
+            const form = randomForm();
+            const url = 'https://www.bing.com/search?q=' + encodeURIComponent(query) + (form ? '&FORM=' + form : '');
+            // 先关掉上一个窗口，浏览器里始终只保留一个标签页
+            if (openedWindows.length > 0) {
+                closeWindow(openedWindows.pop());
+            }
+            const win = window.open(url, '_blank');
+            if (win) {
+                openedWindows.push(win);
+                log(`搜索: ${query}`, 'ok');
+            } else {
+                log('窗口打开失败，可能被弹窗拦截，请允许本站弹窗', 'warn');
+            }
+        }
+
+        // 偶发行为：先打开必应首页停留片刻，再进入搜索（模拟先逛逛再搜）
+        function browseHomepageThenSearch(query) {
+            log('打开必应首页浏览…');
+            if (openedWindows.length > 0) closeWindow(openedWindows.pop());
+            const win = window.open('https://www.bing.com/?FORM=CHROMEIE', '_blank');
+            if (win) openedWindows.push(win);
+            setTimeout(() => openSearch(query), randomMid(2000, 6000) * 1000);
+        }
+
+        function renderKeywords() {
+            const list = document.getElementById('keywordList');
+            list.innerHTML = '';
+            if (sessionKeywords.length === 0) {
+                list.innerHTML = '<span class="placeholder">选择热词来源后点击「开始搜索」，热词会显示在这里</span>';
+                return;
+            }
+            sessionKeywords.forEach((kw, i) => {
+                const chip = document.createElement('span');
+                chip.className = 'chip' + (i < sessionIndex ? ' done' : i === sessionIndex ? ' current' : '');
+                chip.textContent = kw;
+                list.appendChild(chip);
+            });
+        }
+
+        function updateProgress(nextInSec) {
+            const total = sessionKeywords.length;
+            const done = sessionIndex;
+            document.getElementById('progressFill').style.width = total ? (done / total * 100) + '%' : '0%';
+            document.getElementById('progressText').textContent = nextInSec != null
+                ? `${done}/${total} · 下次 ${nextInSec}s`
+                : `${done}/${total}`;
+        }
+
+        function setRunning(state) {
+            running = state;
+            document.getElementById('startSearch').disabled = state;
+            document.getElementById('stopSearch').disabled = !state;
+            document.getElementById('statusDot').className = 'dot' + (state ? ' running' : '');
+            document.getElementById('statusText').textContent = state ? '自动搜索中' : '空闲';
+        }
+
+        // 清理旧会话（不输出日志），开始新搜索前调用
+        function resetState() {
+            if (searchTimerId) { clearTimeout(searchTimerId); searchTimerId = null; }
             closeAllWindows();
+            setRunning(false);
         }
 
-        // Get Weibo hot keywords using new API
-        async function getWeiboHotKeywords() {
-            const response = await fetch('https://v2.xxapi.cn/api/weibohot');
-            const data = await response.json();
-            return data.data.map(item => item.title); // Assuming data field exists in returned JSON
+        // 停止（手动点击时才输出日志）
+        function stopSearch() {
+            resetState();
+            log('已停止自动搜索');
         }
 
-        // Get Baidu hot keywords using new API
-        async function getBaiduHotKeywords() {
-            const response = await fetch('https://v2.xxapi.cn/api/baiduhot');
-            const data = await response.json();
-            return data.data.map(item => item.title); // Assuming data field exists in returned JSON
-        }
-
-        // Get CSDN hot keywords using new API
-        async function getCsdnHotKeywords() {
-            const response = await fetch('https://v2.xxapi.cn/api/csdnhot');
-            const data = await response.json();
-            return data.data.map(item => item.title); // Assuming data field exists in returned JSON
-        }
-
-        // Get Douyin hot keywords using new API
-        async function getDouyinHotKeywords() {
-            const response = await fetch('https://v2.xxapi.cn/api/douyinhot');
-            const data = await response.json();
-            return data.data.map(item => item.word); // Assuming word field exists in returned JSON
-        }
-
-        // Get Bilibili hot keywords using new API
-        async function getBilibiliHotKeywords() {
-            const response = await fetch('https://v2.xxapi.cn/api/bilibilihot');
-            const data = await response.json();
-            return data.data; // 直接返回字符串数组
-        }
-
-        // 获取Hacker News热门新闻
-        async function getHackerNewsHotKeywords() {
-            try {
-                // 首先获取热门新闻的ID列表
-                const response = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
-                const storyIds = await response.json();
-                
-                // 只获取前30个故事
-                const topStories = storyIds.slice(0, 30);
-                
-                // 获取每个故事的详细信息
-                const stories = await Promise.all(
-                    topStories.map(async (id) => {
-                        const storyResponse = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
-                        const story = await storyResponse.json();
-                        return story.title;
-                    })
-                );
-                
-                return stories;
-            } catch (error) {
-                console.error('获取Hacker News数据时出错:', error);
-                return [];
+        // 递归 setTimeout：每次间隔都重新随机，节奏更像真人
+        function scheduleNext() {
+            if (!running || sessionIndex >= sessionKeywords.length) {
+                setRunning(false);
+                log('本次会话全部搜索完成 ✅');
+                return;
             }
-        }
 
-        // 获取Google News热门新闻
-        async function getGoogleNewsHotKeywords() {
-            try {
-                // 使用GNews API获取热门新闻，增加max参数到100
-                const response = await fetch('https://gnews.io/api/v4/top-headlines?lang=en&country=us&max=100&apikey=043834870d8b9c4c55af4ebebaa197ad');
-                const data = await response.json();
-                
-                // 提取新闻标题
-                return data.articles.map(article => article.title);
-            } catch (error) {
-                console.error('获取Google News数据时出错:', error);
-                return [];
+            const minS = parseFloat(document.getElementById('minInterval').value) || 5;
+            const maxS = parseFloat(document.getElementById('maxInterval').value) || 20;
+            const lo = Math.min(minS, maxS), hi = Math.max(minS, maxS);
+            let delay = randomMid(lo, hi);
+
+            // 小概率出现较长停顿（人在看内容 / 离开）
+            if (Math.random() < 0.12) {
+                delay = hi + Math.random() * hi * 0.8;
+                log(`出现一次较长停顿（${Math.round(delay)}s）`);
             }
+
+            updateProgress(Math.round(delay));
+            let remain = Math.round(delay);
+            const tick = setInterval(() => {
+                if (!running) { clearInterval(tick); return; }
+                remain--;
+                if (remain > 0) updateProgress(remain);
+            }, 1000);
+
+            searchTimerId = setTimeout(() => {
+                clearInterval(tick);
+                if (!running) return;
+
+                const keyword = sessionKeywords[sessionIndex];
+                renderKeywords();
+
+                // 15% 概率先逛首页再搜，其余直接搜索
+                if (Math.random() < 0.15) {
+                    browseHomepageThenSearch(humanizeQuery(keyword));
+                } else {
+                    openSearch(humanizeQuery(keyword));
+                }
+
+                sessionIndex++;
+                updateProgress(null);
+                renderKeywords();
+                scheduleNext();
+            }, delay * 1000);
         }
 
-        // Display hot keywords on page
-        async function displayHotKeywords() {
-            // Stop previous search if running
-            stopSearch();
+        // 开始
+        async function startSearch() {
+            resetState();
 
             const source = document.getElementById('sourceSelect').value;
-            let keywords = [];
+            log(`正在获取「${HOT_SOURCES[source].name}」热词…`);
 
-            if (source === 'weibo') {
-                keywords = await getWeiboHotKeywords();
-            } else if (source === 'baidu') {
-                keywords = await getBaiduHotKeywords();
-            } else if (source === 'csdn') {
-                keywords = await getCsdnHotKeywords();
-            } else if (source === 'douyin') {
-                keywords = await getDouyinHotKeywords();
-            } else if (source === 'bilibili') {
-                keywords = await getBilibiliHotKeywords();
-            } else if (source === 'hackernews') {
-                keywords = await getHackerNewsHotKeywords();
-            } else if (source === 'googlenews') {
-                keywords = await getGoogleNewsHotKeywords();
+            let keywords;
+            try {
+                keywords = await fetchKeywords(source);
+            } catch (e) {
+                log('热词获取失败：' + e.message, 'warn');
+                return;
+            }
+            if (!keywords || keywords.length === 0) {
+                log('未获取到任何热词，请稍后重试', 'warn');
+                return;
             }
 
-            // Display keywords at bottom of page
-            const keywordList = document.getElementById('keywordList');
-            keywordList.innerHTML = ''; // Clear previous content
-            keywords.forEach(keyword => {
-                const li = document.createElement('li');
-                li.textContent = keyword;
-                keywordList.appendChild(li);
-            });
+            // 随机顺序 + 随机截断（每轮只搜一部分，更像正常使用）
+            let pool = shuffle(keywords);
+            const cap = Math.min(pool.length, 20 + Math.floor(Math.random() * 11)); // 20~30 条
+            pool = pool.slice(0, cap);
 
-            // Get user-set intervals
-            const minInterval = parseInt(document.getElementById('minInterval').value, 10) * 1000;
-            const maxInterval = parseInt(document.getElementById('maxInterval').value, 10) * 1000;
+            sessionKeywords = pool;
+            sessionIndex = 0;
+            renderKeywords();
+            updateProgress(null);
+            setRunning(true);
+            log(`已加载 ${pool.length} 条热词，开始自动搜索`);
 
-            // Make Bing search at random intervals
-            let index = 0;
-            currentIntervalId = setInterval(() => {
-                if (index < keywords.length) {
-                    // Close previous window
-                    if (openedWindows.length > 0) {
-                        const lastWindow = openedWindows[openedWindows.length - 1];
-                        closeWindow(lastWindow);
-                        openedWindows.pop();
-                    }
-
-                    const keyword = keywords[index];
-                    const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(keyword)}&FORM=EDGSPH`;
-                    const newWindow = window.open(searchUrl, '_blank');
-                    if (newWindow) {
-                        openedWindows.push(newWindow); // Save window handle
-                        console.log('新窗口已打开，当前窗口数量:', openedWindows.length);
-                    } else {
-                        console.log('新窗口打开失败，可能是被浏览器阻止');
-                    }
-                    index++;
-                } else {
-                    clearInterval(currentIntervalId); // Stop timer
-                    currentIntervalId = null;
-                }
-            }, Math.random() * (maxInterval - minInterval) + minInterval);
+            // 人类不会瞬间开始：先随机等待一小会儿
+            searchTimerId = setTimeout(scheduleNext, randomMid(2000, 6000));
         }
 
-        // Set button click events after page loads
-        window.onload = function() {
-            document.getElementById('startSearch').onclick = displayHotKeywords;
-            document.getElementById('stopSearch').onclick = stopSearch;
-        }
+        // ---- 事件绑定 ----
+        window.onload = function () {
+            document.getElementById('startSearch').addEventListener('click', startSearch);
+            document.getElementById('stopSearch').addEventListener('click', stopSearch);
+            renderKeywords();
+            updateProgress(null);
+        };
     </script>
 </head>
 <body>
-    <h1>当前热门头条</h1>
-    <div>
-        <label for="sourceSelect">选择热词来源:</label>
-        <select id="sourceSelect">
-            <option value="weibo">微博热搜</option>
-            <option value="baidu">百度热搜</option>
-            <option value="csdn">CSDN热搜</option>
-            <option value="douyin">抖音热榜</option>
-            <option value="bilibili">Bilibili热榜</option>
-            <option value="hackernews">Hacker News</option>
-            <option value="googlenews">Google News</option>
-        </select>
-        <label for="minInterval">最小间隔（秒）:</label>
-        <input type="number" id="minInterval" value="5">
-        <label for="maxInterval">最大间隔（秒）:</label>
-        <input type="number" id="maxInterval" value="20">
-        <button id="startSearch">开始搜索</button>
-        <button id="stopSearch">停止搜索</button>
+    <div class="container">
+        <header>
+            <h1>热门头条 · <span>自动搜索</span></h1>
+            <div class="status-pill">
+                <span class="dot" id="statusDot"></span>
+                <span id="statusText">空闲</span>
+            </div>
+        </header>
+
+        <div class="card">
+            <div class="controls">
+                <div class="field">
+                    <label for="sourceSelect">热词来源</label>
+                    <select id="sourceSelect">
+                        <option value="weibo">微博热搜</option>
+                        <option value="baidu">百度热搜</option>
+                        <option value="csdn">CSDN 热榜</option>
+                        <option value="douyin">抖音热榜</option>
+                        <option value="bilibili">B 站热榜</option>
+                        <option value="hackernews">Hacker News</option>
+                        <option value="googlenews">Google News</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="minInterval">最小间隔（秒）</label>
+                    <input type="number" id="minInterval" value="5" min="1">
+                </div>
+                <div class="field">
+                    <label for="maxInterval">最大间隔（秒）</label>
+                    <input type="number" id="maxInterval" value="20" min="2">
+                </div>
+                <button class="btn btn-primary" id="startSearch">开始搜索</button>
+                <button class="btn btn-ghost" id="stopSearch" disabled>停止</button>
+            </div>
+
+            <div class="progress-row">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText">0/0</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>本次会话热词</h2>
+            <div class="chips" id="keywordList"></div>
+            <div class="log" id="logBox"></div>
+        </div>
     </div>
-    <h2>获取到的热词</h2>
-    <ul id="keywordList">
-        <!-- Hot headlines will be displayed here -->
-    </ul>
 </body>
 </html>
