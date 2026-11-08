@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>迷你数独 · 每日 6x6 与经典 9x9</title>
+<meta name="description" content="免费在线迷你数独：每日 6x6 小格数独，也支持经典 9x9。四种难度、铅笔标记、提示、计时与连续打卡记录，无需注册。">
+<meta name="theme-color" content="#f5f8fc">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Cg fill='white'%3E%3Crect x='12' y='12' width='18' height='18' rx='2'/%3E%3Crect x='34' y='12' width='18' height='18' rx='2' opacity='.45'/%3E%3Crect x='12' y='34' width='18' height='18' rx='2' opacity='.45'/%3E%3Crect x='34' y='34' width='18' height='18' rx='2'/%3E%3C/g%3E%3C/svg%3E">
+<script>
+window.__diagErrors = [];
+window.onerror = function (msg, src, line, col) {
+  window.__diagErrors.push(msg + '  @ ' + String(src || '').split('/').pop() + ':' + line + ':' + col);
+  return false;
+};
+window.addEventListener('unhandledrejection', function (e) {
+  window.__diagErrors.push('Promise 未处理: ' + ((e.reason && e.reason.message) || e.reason));
+});
+</script>
+<link rel="stylesheet" href="css/main.css">
+<style>
+#diag-out { position: fixed; left: 0; right: 0; bottom: 0; z-index: 99999; margin: 0;
+  max-height: 56vh; overflow: auto; padding: 14px 18px; background: #0f172a; color: #dbeafe;
+  font: 12.5px/1.7 ui-monospace, Consolas, monospace; white-space: pre-wrap;
+  border-top: 3px solid #2563eb; box-shadow: 0 -8px 30px rgba(0,0,0,.35); }
+</style></head>
+<body>
+<pre id="diag-out">诊断运行中…</pre>
+
+<!-- ============================================================ 图标定义 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 8h11a5 5 0 0 1 0 10h-6"/><path d="M7 4 3 8l4 4"/>
+    </symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8.6 20H20"/><path d="m14.5 4.5 5 5a2 2 0 0 1 0 2.8l-6.2 6.2a2 2 0 0 1-2.8 0l-5-5a2 2 0 0 1 0-2.8l6.2-6.2a2 2 0 0 1 2.8 0Z"/><path d="m9 9 6 6"/>
+    </symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </symbol>
+    <symbol id="i-hint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 18h6"/><path d="M10 22h4"/>
+      <path d="M12 2a6 6 0 0 0-3.6 10.8c.5.4.8 1 .9 1.7l.1.5h5.2l.1-.5c.1-.7.4-1.3.9-1.7A6 6 0 0 0 12 2Z"/>
+    </symbol>
+    <symbol id="i-restart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 3v5h-5"/>
+    </symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M9 5v14M15 5v14"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5.2c0-.8.9-1.3 1.6-.9l8.4 5.4c.6.4.6 1.3 0 1.7l-8.4 5.4c-.7.4-1.6-.1-1.6-.9Z"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m4 12.5 5 5L20 6.5"/>
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ============================================================ 顶栏 -->
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="index.html">
+      <span class="brand__mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="brand__text">
+        <span class="brand__title">迷你数独</span>
+        <span class="brand__sub">Mini Sudoku</span>
+      </span>
+    </a>
+
+    <nav class="nav" id="nav" aria-label="游戏模式">
+      <a href="index.html" data-mode="daily">每日</a>
+      <a href="index.html?mode=hard" data-mode="hard">每日挑战</a>
+      <a href="index.html?mode=practice" data-mode="practice">不限</a>
+      <a href="archive.html" data-mode="archive">往期</a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <div class="layout">
+
+    <!-- ------------------------------------------------------- 棋盘区 -->
+    <section class="board-panel" aria-label="数独棋盘">
+      <div class="statusbar">
+        <span class="chip chip--accent" id="chip-difficulty">进阶</span>
+        <span class="chip chip--muted" id="chip-board">6×6</span>
+        <span class="chip chip--muted" id="chip-meta" hidden></span>
+        <span class="chip chip--ok" id="chip-streak" hidden></span>
+
+        <span class="timer" id="timer-wrap" hidden>
+          <span class="timer__label">用时</span>
+          <span id="timer">00:00</span>
+          <button class="icon-btn" id="btn-pause" type="button" title="暂停 (空格)" aria-label="暂停计时">
+            <svg id="pause-icon"><use href="#i-pause"></use></svg>
+          </button>
+        </span>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board" id="board" role="grid" aria-label="数独棋盘"></div>
+      </div>
+
+      <div class="controls">
+        <div class="difficulty-block">
+          <div class="difficulty" id="difficulty" role="group" aria-label="难度"></div>
+          <p class="difficulty-hint" id="difficulty-hint" hidden></p>
+        </div>
+
+        <div class="actions">
+          <button class="action" type="button" id="btn-undo" data-action="undo" title="撤销 (Z)">
+            <svg><use href="#i-undo"></use></svg><span>撤销</span>
+          </button>
+          <button class="action" type="button" id="btn-erase" data-action="erase" title="擦除 (Backspace)">
+            <svg><use href="#i-eraser"></use></svg><span>擦除</span>
+          </button>
+          <button class="action" type="button" id="btn-notes" data-action="notes" title="铅笔标记 (N)">
+            <svg><use href="#i-pencil"></use></svg><span>标记</span>
+          </button>
+          <button class="action" type="button" id="btn-hint" data-action="hint" title="提示 (H)">
+            <svg><use href="#i-hint"></use></svg><span>提示</span>
+          </button>
+          <button class="action" type="button" id="btn-restart" data-action="restart" title="重新开始">
+            <svg><use href="#i-restart"></use></svg><span>重来</span>
+          </button>
+        </div>
+
+        <div class="keypad" id="keypad" role="group" aria-label="数字键盘"></div>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------- 侧栏 -->
+    <aside class="side" id="side"></aside>
+  </div>
+</main>
+
+<footer class="footer">
+  <span>© <span id="year">2026</span> 迷你数独</span>
+  <a href="index.html?mode=daily">每日一题</a>
+  <a href="index.html?mode=practice">不限模式</a>
+  <a href="archive.html">往期档案</a>
+</footer>
+
+<!-- ============================================================ 完成弹窗 -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal__card">
+    <div class="modal__emoji" id="modal-emoji">🎉</div>
+    <h2 class="modal__title" id="modal-title">完成！</h2>
+    <p class="modal__sub" id="modal-sub"></p>
+    <div class="stats" id="modal-stats"></div>
+    <div class="modal__actions">
+      <button class="btn" type="button" id="modal-secondary">往期题目</button>
+      <button class="btn btn--primary" type="button" id="modal-primary">再来一题</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/core.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/game.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var lines = [];
+  function log(t) { lines.push(t); }
+  function ok(label, detail) { log('  \u2705 ' + label + (detail === undefined ? '' : '  ' + detail)); }
+  function bad(label, detail) { log('  \u274c ' + label + (detail === undefined ? '' : '  ' + detail)); }
+  function mark(cond, label, detail) { (cond ? ok : bad)(label, detail); }
+
+  function finish(title) {
+    log('');
+    log('协议: ' + location.protocol + '     视口: ' + window.innerWidth + 'x' + window.innerHeight);
+    log('地址: ' + location.href);
+    log('');
+    log('结果: ' + title);
+    var pre = document.getElementById('diag-out');
+    pre.innerHTML = lines.join('\n')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/\u2705/g, '<span style="color:#57d9a3">\u2705</span>')
+      .replace(/\u274c/g, '<span style="color:#ff8a7a">\u274c</span>');
+    document.title = '诊断: ' + title;
+  }
+
+  window.addEventListener('load', function () { setTimeout(run, 600); });
+
+  function run() {
+    var errors = window.__diagErrors || [];
+
+    log('【1】基础环境');
+    ok('页面脚本可以执行');
+    try { ok('localStorage 可访问', '已有 ' + localStorage.length + ' 条'); }
+    catch (e) { bad('localStorage 被拒绝', e.name + ': ' + e.message); }
+    log('    注意：直接用 file:// 打开时，部分浏览器会限制本地存储（站点有内存兜底，不影响玩）');
+
+    log('');
+    log('【2】页面脚本是否加载');
+    var S = window.Sudoku;
+    mark(!!S, 'window.Sudoku 命名空间', typeof S);
+    if (!S) { log(''); log('  → 页面脚本完全没有执行，说明 <script src> 没有加载成功'); return finish('页面脚本未加载'); }
+    mark(!!S.dates, 'core.js');
+    mark(!!S.Generator, 'generator.js');
+    mark(!!S.createGame, 'game.js');
+    mark(!!S.stats, 'stats.js');
+    mark(!!S.ui, 'ui.js');
+    mark(!!S.app, 'app.js');
+
+    log('');
+    log('【3】应用是否完成初始化');
+    var app = S.app;
+    if (!app) { log('  → app.js 执行失败'); return finish('app.js 失败'); }
+    var game = app.state && app.state.game;
+    mark(!!game, '对局对象', game ? game.size + 'x' + game.size : '无');
+    if (!game) { log('  → boot() 中途抛错，界面不会被填充'); return finish('初始化中断'); }
+
+    log('');
+    log('【4】界面元素是否渲染');
+    var boardCells = document.querySelectorAll('#board .cell').length;
+    var keypadKeys = document.querySelectorAll('#keypad .key').length;
+    var diffBtns = document.querySelectorAll('#difficulty button').length;
+    var sideCards = document.querySelectorAll('#side .card').length;
+    mark(boardCells > 0, '棋盘格子', boardCells + ' 个');
+    mark(keypadKeys > 0, '数字键', keypadKeys + ' 个');
+    mark(diffBtns > 0, '难度按钮', diffBtns + ' 个');
+    mark(sideCards > 0, '侧栏卡片', sideCards + ' 张');
+
+    log('');
+    log('【5】样式是否加载');
+    var link = document.querySelector('link[href*="main.css"]');
+    mark(!!link, '已引用 main.css', link ? link.getAttribute('href') : '未找到');
+    var cell = document.querySelector('#board .cell');
+    if (cell) {
+      var w = cell.getBoundingClientRect().width;
+      var h = cell.getBoundingClientRect().height;
+      mark(w > 10 && h > 10, '格子有实际尺寸', w.toFixed(1) + ' x ' + h.toFixed(1));
+      mark(getComputedStyle(cell).boxSizing !== '', '样式表已生效', 'box-sizing=' + getComputedStyle(cell).boxSizing);
+    } else {
+      bad('没有格子可测样式');
+    }
+    var key = document.querySelector('#keypad .key');
+    if (key) mark(key.getBoundingClientRect().height > 10, '数字键有实际尺寸',
+      key.getBoundingClientRect().height.toFixed(1) + 'px');
+
+    log('');
+    log('【6】捕获到的脚本错误');
+    if (errors.length === 0) ok('没有脚本错误');
+    else errors.forEach(function (e) { bad(e); });
+
+    var fatal = errors.length > 0 || boardCells === 0 || keypadKeys === 0 || !game;
+    finish(fatal ? '发现问题 —— 请把上面内容截图发我' : '一切正常');
+  }
+})();
+</script>
+</body>
+</html>
