@@ -18,11 +18,19 @@
 
 ## 打开方式
 
-直接双击 **`index.html`**，或拖进 Chrome / Edge。无需安装、无需构建；日常使用不需要联网。只有在首次使用「扫描手写记事」时，需要联网加载 OCR 引擎和中文识别数据（约 2 MB，之后浏览器会缓存）。
+直接双击 **`index.html`**，或拖进 Chrome / Edge。无需安装、无需构建。日常任务数据离线保存；**AI 手写识别需要联网**，图片会发送给 SiliconFlow；本地 Tesseract 首次使用也会联网加载引擎。
 
-- `standalone.html` 是 CSS / JS 全部内联的单文件版，适合拷贝到别的电脑或发给朋友；行为和源文件一致。
+- `standalone.html` 是 CSS / JS 全部内联的单文件版，适合拷贝到别的电脑、部署或发给朋友；行为和源文件一致。
 - 第一次打开会放入 4 个示例任务，可随时编辑或删除；也可以在设置里清空后从空工作台开始。
-- 数据只保存在当前浏览器的 `localStorage`（键名 `craftCheckin.v1`），不上传。
+- 任务数据只保存在当前浏览器的 `localStorage`（键名 `craftCheckin.v1`）；只有启用 AI 识别时图片才会上传。
+
+### 部署 / 更新
+
+- 部署 `index.html` 时必须同时上传最新的 `app.js`、`core.js`、`styles.css`；或者只部署单文件 `standalone.html`，最省事。
+- 静态资源已带 `?v=1.3.0` 缓存参数，但 CDN/浏览器仍可能缓存旧文件：部署后请 purge CDN 或强制刷新。
+- 部署后打开设置，底部应显示 **`v1.4.0`**；扫描器帮助应显示 **「AI 识别（SiliconFlow DeepSeek-OCR v1.4.0）」**。如果还是旧文案，说明部署的是旧文件。
+- 设置里有 **「测试 SiliconFlow 连接」**；成功会提示 `SiliconFlow 连接正常 HTTP 200`，失败会显示具体 CORS/Key 错误。
+- 如果托管平台设置了 CSP，需要允许 `connect-src https://api.siliconflow.cn`；否则浏览器会拦截请求。
 - 推荐 Chrome / Edge。手机浏览器可直接打开同一份文件；通过本地静态文件服务访问时体验更完整。
 
 ## 合成怎么玩
@@ -87,19 +95,19 @@ Edge 没有向网页开放 OCR 接口，网页 JavaScript 不能直接触发「�
 
 > 注意：Edge 的 OCR 对连笔手写的效果也不保证；这张照片即使走 Edge OCR 也可能需要较多校对。这是浏览器能力限制，不是应用接口没接好。
 
-#### AI 手写识别（DeepSeek 直连）
+#### AI 手写识别（SiliconFlow DeepSeek-OCR）
 
-本地 Tesseract 只适合印刷体，连笔中文手写基本不可用。现在**不需要后端**：浏览器直接调用 DeepSeek：
+本地 Tesseract 只适合印刷体，连笔中文手写基本不可用。现在**不需要后端**：浏览器直接调用 SiliconFlow 的 DeepSeek-OCR：
 
-1. 默认已启用，Key 以 XOR + Base64 混淆内置在 `app.js`。
-2. 设置 → AI 手写识别 → 可启停、改 Key/模型；默认 `deepseek-flash`。
+1. 默认已启用，SiliconFlow Key 以 XOR + Base64 混淆内置在 `app.js`。
+2. 设置 → AI 手写识别 → 可启停、改 Key；模型固定为 `deepseek-ai/DeepSeek-OCR`。
 3. 扫描器点「AI 识别」；失败时可点「本地识别」回退。
 
-DeepSeek 的 API 允许浏览器跨域。请求会关闭思考模式（`thinking: {type: "disabled"}`），并直接上传原图（4.5 MB 以内），避免先输出 `reasoning_content` 导致内容为空。
+请求地址为 `https://api.siliconflow.cn/v1/chat/completions`，使用 `<image>\n<|grounding|>Convert the document to markdown.` 提示词，并清掉返回里的 `<|ref|>` / 坐标标记。SiliconFlow 允许浏览器跨域。
 
-> 客户端混淆不等于加密，Key 仍可被还原。分享或上传 HTML/JS 前请先清空 Key；当前默认 Key 已在聊天中出现过，建议轮换。
+> 客户端混淆不等于加密，Key 仍可被还原。分享或上传 HTML/JS 前请先清空 Key；当前 Key 已在聊天中出现过，建议轮换。
 
-连笔手写即使走 DeepSeek 也可能出现错字，必须校对。
+实测 SiliconFlow DeepSeek-OCR 对这张连笔照片的识别结果弱于 DeepSeek 对话模型，会漏行/串行；如果更看重识别准确率，需要人工校对或换回之前验证过的 DeepSeek `deepseek-flash` 直连。
 
 ### 5. 数据
 
@@ -215,7 +223,7 @@ node tests/ocr.test.js
 - 系统通知与声音需要用户手势开启，且 `file://` 下浏览器策略可能不同；站内提醒不受影响。
 - 本地 OCR 首次使用需要联网从 unpkg 加载识别引擎与中文数据（约 2 MB，浏览器会缓存）；离线时仍可在扫描器右侧手动输入/粘贴文字并拆分为待办。
 - 本地 OCR 对连笔中文手写基本不可用。Edge 的 OCR 也没有网页 API，只能按 README 里的「网页捕获 → 复制文本 → 粘贴」流程手动使用，而且对这张连笔字仍可能识别很差。
-- 要自动、准确识别这类字迹，目前使用 DeepSeek Flash 直连；如果不接受 API，扫描器仍保留手动粘贴/逐行校对。
+- 要自动、准确识别这类字迹，目前使用 SiliconFlow DeepSeek-OCR 直连；如果不接受 API，扫描器仍保留手动粘贴/逐行校对。
 - 手写识别准确率受字迹、光线、拍摄角度影响，识别结果务必校对。
 - 没有后台推送；页面关闭后提醒不会触发。
 - 删除任务只从清单移除，历史合成记录（dayLog）会保留；不会恢复任务本身。

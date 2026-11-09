@@ -24,21 +24,21 @@ function inlineScript(code, label) {
 let out = html;
 
 out = out.replace(
-  /<link\s+rel="stylesheet"\s+href="styles\.css"\s*>/i,
+  /<link\s+rel="stylesheet"\s+href="styles\.css(?:\?[^"]*)?"\s*>/i,
   () => '<style>\n' + css.replace(/<\/style/gi, '<\\/style') + '\n</style>'
 );
 
 out = out.replace(
-  /<script\s+src="core\.js"><\/script>/i,
+  /<script\s+src="core\.js(?:\?[^"]*)?"><\/script>/i,
   () => '<script>\n' + inlineScript(core, 'core.js') + '\n</script>'
 );
 
 out = out.replace(
-  /<script\s+src="app\.js"><\/script>/i,
+  /<script\s+src="app\.js(?:\?[^"]*)?"><\/script>/i,
   () => '<script>\n' + inlineScript(app, 'app.js') + '\n</script>'
 );
 
-if (/<link[^>]+href=["']styles\.css["']|<script[^>]+src=["'](?:core|app)\.js["']/i.test(out)) {
+if (/<link[^>]+href=["']styles\.css|<script[^>]+src=["'](?:core|app)\.js/i.test(out)) {
   console.error('构建失败：仍有外部本地资源引用未内联。');
   process.exit(1);
 }

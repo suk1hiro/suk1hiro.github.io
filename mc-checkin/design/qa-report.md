@@ -236,3 +236,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File E:\workspace\paint\craft-che
 - 已删除腾讯云/PPOCR 后端文件；前端保留「本地识别」兜底。
 - 验证：file:// 打开应用，真实照片直接调用 DeepSeek，HTTP 200，中文正常，拆出 15 条建议；UI 回归 PASS 19，OCR 24/24，核心 57/57，自检 15/15。
 - 风险：客户端 Key 可被还原；已提示分享/上传前清空，并建议轮换。
+
+### 部署诊断补充（2026-11-03）
+
+- 定位：DeepSeek Key 有效（text completion 200）；DeepSeek API 对任意 HTTPS Origin 都返回 CORS 允许，因此“部署版不识别”更可能是旧 app.js/旧 standalone 被 CDN 缓存，或页面不是最新构建。
+- 修复：index.html 的 core.js/app.js/styles.css 加 ?v=1.3.0；设置页底部显示 v1.3.0；扫描器 AI 帮助显示“DeepSeek 直连 v1.3.0”；设置新增「测试 DeepSeek 连接」按钮。
+- 构建脚本原先的正则不接受 ?v= 查询串，已验证并修复；standalone.html 重新内联为 351KB，直接 file:// 跑真实 DeepSeek 返回 15 条建议。
+- 部署检查：设置底部必须是 v1.3.0；测试连接必须 HTTP 200；否则清 CDN 缓存并重新上传 app.js/core.js/styles.css 或改用 standalone.html。
+
+---
+
+## 12. Lead 调整：SiliconFlow DeepSeek-OCR 直连（2026-11-09 11:10）
+
+- 按用户要求改为 SiliconFlow：
+  - Base `https://api.siliconflow.cn/v1`；
+  - 模型 `deepseek-ai/DeepSeek-OCR`；
+  - Key 以 XOR + Base64 存于前端默认配置，localStorage 只存 `apiKeyEnc`；
+  - 不再需要任何后端。
+- SiliconFlow `/v1/chat/completions` 支持 CORS，浏览器可直接调用；请求使用 `<image>\n<|grounding|>Convert the document to markdown.`，返回后移除 `<|ref|>`/坐标标记并过滤 `text` 行。
+- 验证：真实 Key 连接测试 HTTP 200；真实照片调用成功，但 SiliconFlow DeepSeek-OCR 对这张连笔手写明显弱于此前 DeepSeek `deepseek-flash`，出现漏行/串行/误识别；识别结果需人工校对。
+- 版本升到 v1.4.0，资源 `?v=1.4.0`，设置底部与扫描器帮助显示 v1.4.0；新增「测试 SiliconFlow 连接」。
+- 测试：UI 19/19、OCR 24/24、核心 57/57、自检 15/15；standalone.html 已重新构建。

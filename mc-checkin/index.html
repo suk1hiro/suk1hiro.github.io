@@ -7,7 +7,7 @@
 <title>方块清单 · Craft Check-in</title>
 <meta name="description" content="把今天，合成出来。每日打卡、周期任务、手写扫描、合成记录与定时提醒。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23744a2b'/%3E%3Crect width='32' height='12' fill='%235f9137'/%3E%3Cpath fill='%2381b84e' d='M0 0h8v4H0zm12 0h10v4H12zm16 0h4v4h-4zM4 8h12v4H4zm16 0h8v4h-8z'/%3E%3Cpath fill='%235b3d23' d='M4 16h8v8H4zm16 0h8v8h-8zM12 20h8v8h-8z'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=1.4.0">
 <style>
 /* ===== OCR 扫描手写记事（本功能独立样式，不改变 Minecraft 主题主体） ===== */
 .ocr-modal{width:min(1120px,96vw);max-height:92dvh;display:flex;flex-direction:column}
@@ -893,8 +893,8 @@ html.is-static .ocr-progress span{transition:none}
       </section>
 
       <section class="settings-section" id="aiOcrSection">
-        <h3>AI 手写识别（DeepSeek 直连）</h3>
-        <p class="settings-text">浏览器直接调用 DeepSeek，不需要后端、不需要启动脚本。Key 以混淆形式内置为默认值；照片会发送给 DeepSeek。分享/上传 HTML 前请先清空 Key。</p>
+        <h3>AI 手写识别（SiliconFlow DeepSeek-OCR）</h3>
+        <p class="settings-text">浏览器直接调用 SiliconFlow 的 DeepSeek-OCR，不需要后端、不需要启动脚本。Key 以混淆形式内置为默认值；照片会发送给 SiliconFlow。分享/上传 HTML 前请先清空 Key。</p>
         <label class="switch-line settings-switch">
           <input id="aiOcrEnabled" type="checkbox">
           <span class="switch" aria-hidden="true"></span>
@@ -907,10 +907,11 @@ html.is-static .ocr-progress span{transition:none}
           </div>
           <div class="field">
             <label for="aiOcrModel">模型</label>
-            <input class="input" id="aiOcrModel" type="text" autocomplete="off" value="deepseek-flash">
+            <input class="input" id="aiOcrModel" type="text" autocomplete="off" value="deepseek-ai/DeepSeek-OCR">
           </div>
         </div>
-        <p class="field-hint">Base 固定为 <code>https://api.deepseek.com</code>；DeepSeek 允许浏览器跨域。Key 在输入时自动保存，刷新不丢。</p>
+        <p class="field-hint">Base 固定为 <code>https://api.siliconflow.cn/v1</code>；SiliconFlow 允许浏览器跨域。Key 在输入时自动保存，刷新不丢。</p>
+        <button class="btn btn-ghost btn-sm" id="aiOcrTestBtn" type="button">测试 SiliconFlow 连接</button>
       </section>
 
       <section class="settings-section">
@@ -939,7 +940,7 @@ html.is-static .ocr-progress span{transition:none}
     </div>
 
     <footer class="modal-foot">
-      <span class="modal-foot-note">数据版本 1 · 仅本机</span>
+      <span class="modal-foot-note">数据版本 1 · v1.4.0 · 仅本机</span>
       <button class="btn btn-primary" type="button" data-close-modal="1">完成</button>
     </footer>
   </div>
@@ -1034,7 +1035,7 @@ html.is-static .ocr-progress span{transition:none}
   </defs>
 </svg>
 
-<script src="core.js"></script>
-<script src="app.js"></script>
+<script src="core.js?v=1.4.0"></script>
+<script src="app.js?v=1.4.0"></script>
 </body>
 </html>

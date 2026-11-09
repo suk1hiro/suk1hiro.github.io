@@ -7280,8 +7280,8 @@ html.is-static .ocr-progress span{transition:none}
       </section>
 
       <section class="settings-section" id="aiOcrSection">
-        <h3>AI 手写识别（DeepSeek 直连）</h3>
-        <p class="settings-text">浏览器直接调用 DeepSeek，不需要后端、不需要启动脚本。Key 以混淆形式内置为默认值；照片会发送给 DeepSeek。分享/上传 HTML 前请先清空 Key。</p>
+        <h3>AI 手写识别（SiliconFlow DeepSeek-OCR）</h3>
+        <p class="settings-text">浏览器直接调用 SiliconFlow 的 DeepSeek-OCR，不需要后端、不需要启动脚本。Key 以混淆形式内置为默认值；照片会发送给 SiliconFlow。分享/上传 HTML 前请先清空 Key。</p>
         <label class="switch-line settings-switch">
           <input id="aiOcrEnabled" type="checkbox">
           <span class="switch" aria-hidden="true"></span>
@@ -7294,10 +7294,11 @@ html.is-static .ocr-progress span{transition:none}
           </div>
           <div class="field">
             <label for="aiOcrModel">模型</label>
-            <input class="input" id="aiOcrModel" type="text" autocomplete="off" value="deepseek-flash">
+            <input class="input" id="aiOcrModel" type="text" autocomplete="off" value="deepseek-ai/DeepSeek-OCR">
           </div>
         </div>
-        <p class="field-hint">Base 固定为 <code>https://api.deepseek.com</code>；DeepSeek 允许浏览器跨域。Key 在输入时自动保存，刷新不丢。</p>
+        <p class="field-hint">Base 固定为 <code>https://api.siliconflow.cn/v1</code>；SiliconFlow 允许浏览器跨域。Key 在输入时自动保存，刷新不丢。</p>
+        <button class="btn btn-ghost btn-sm" id="aiOcrTestBtn" type="button">测试 SiliconFlow 连接</button>
       </section>
 
       <section class="settings-section">
@@ -7326,7 +7327,7 @@ html.is-static .ocr-progress span{transition:none}
     </div>
 
     <footer class="modal-foot">
-      <span class="modal-foot-note">数据版本 1 · 仅本机</span>
+      <span class="modal-foot-note">数据版本 1 · v1.4.0 · 仅本机</span>
       <button class="btn btn-primary" type="button" data-close-modal="1">完成</button>
     </footer>
   </div>
@@ -8658,9 +8659,9 @@ html.is-static .ocr-progress span{transition:none}
 
   var OCR_AI_DEFAULTS = {
     enabled: true,
-    apiKey: decodeOcrSecret('EBlMVUUZW1JFTgYCAwZTRlBfQBRcUEVMBQQDUwYRUFMRFQo='),
-    base: 'https://api.deepseek.com',
-    model: 'deepseek-flash'
+    apiKey: decodeOcrSecret('EBlMEAVAFRcRTkZZVk8PGwAfGlkbBgBHU0ZLRgkFBRUAXxobAlRFRkJFFBcFBRxKAw8L'),
+    base: 'https://api.siliconflow.cn/v1',
+    model: 'deepseek-ai/DeepSeek-OCR'
   };
   var MODAL_IDS = ['taskModal', 'ocrModal', 'settingsModal', 'confirmModal'];
   var OCR_ENGINE = {
@@ -10388,14 +10389,26 @@ html.is-static .ocr-progress span{transition:none}
       var raw = localStorage.getItem(OCR_CONFIG_KEY);
       if (raw) {
         var parsed = JSON.parse(raw) || {};
-        var key = parsed.apiKeyEnc ? decodeOcrSecret(parsed.apiKeyEnc) : (typeof parsed.apiKey === 'string' ? parsed.apiKey : '');
-        cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : OCR_AI_DEFAULTS.enabled;
-        cfg.apiKey = key || OCR_AI_DEFAULTS.apiKey;
-        cfg.base = typeof parsed.base === 'string' && parsed.base ? parsed.base : OCR_AI_DEFAULTS.base;
-        cfg.model = typeof parsed.model === 'string' && parsed.model ? parsed.model : OCR_AI_DEFAULTS.model;
-        if (!key && OCR_AI_DEFAULTS.apiKey) {
+        var base = typeof parsed.base === 'string' ? parsed.base : '';
+        var model = typeof parsed.model === 'string' ? parsed.model : '';
+        // 从旧的 DeepSeek 直连/后端配置迁移到 SiliconFlow DeepSeek-OCR。
+        var isSiliconFlow = /siliconflow/i.test(base) && /DeepSeek-OCR/i.test(model);
+        if (!isSiliconFlow) {
           cfg.enabled = true;
+          cfg.apiKey = OCR_AI_DEFAULTS.apiKey;
+          cfg.base = OCR_AI_DEFAULTS.base;
+          cfg.model = OCR_AI_DEFAULTS.model;
           migrated = true;
+        } else {
+          var key = parsed.apiKeyEnc ? decodeOcrSecret(parsed.apiKeyEnc) : (typeof parsed.apiKey === 'string' ? parsed.apiKey : '');
+          cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : OCR_AI_DEFAULTS.enabled;
+          cfg.apiKey = key || OCR_AI_DEFAULTS.apiKey;
+          cfg.base = base || OCR_AI_DEFAULTS.base;
+          cfg.model = model || OCR_AI_DEFAULTS.model;
+          if (!key && OCR_AI_DEFAULTS.apiKey) {
+            cfg.enabled = true;
+            migrated = true;
+          }
         }
         if (parsed.backend || parsed.apiKeyEnc || parsed.apiKey) migrated = true;
       }
@@ -10510,7 +10523,7 @@ html.is-static .ocr-progress span{transition:none}
     syncOcrUi();
     if (silent) return;
     if (state.ocr.ai.enabled) {
-      toast('AI 手写识别已启用', { text: '扫描时会直接调用 DeepSeek。', icon: icon('spark'), tone: 'success' });
+      toast('AI 手写识别已启用', { text: '扫描时会直接调用 SiliconFlow DeepSeek-OCR。', icon: icon('spark'), tone: 'success' });
     }
   }
 
@@ -10550,7 +10563,7 @@ html.is-static .ocr-progress span{transition:none}
       } else if (tencent) {
         $('ocrEngineHelp').textContent = '当前：腾讯云 OCR（后端）。先启动 start-tencent-ocr.bat，再点「腾讯云 OCR」。';
       } else if (ai) {
-        $('ocrEngineHelp').textContent = '当前：AI 识别（DeepSeek 直连）。照片会发送给 DeepSeek；识别后可校对。';
+        $('ocrEngineHelp').textContent = '当前：AI 识别（SiliconFlow DeepSeek-OCR v1.4.0）。照片会发送给 SiliconFlow；识别后可校对。';
       } else if (state.ocr.ai.enabled) {
         $('ocrEngineHelp').textContent = 'AI 已开启，但缺少 API Key；当前会退回本地 OCR。';
       } else {
@@ -10775,7 +10788,8 @@ html.is-static .ocr-progress span{transition:none}
         .replace(/^[（(]\d{1,2}[)）]\s*/, '')
         .replace(/^(待办事项|待办|todo|to-do|今日待办)\s*[:：]?\s*/i, '');
       if (!line) return;
-      if (/^(今日|今日待办|待办清单|todo|to-do)$/i.test(line)) return;
+      if (/^(今日|今日待办|待办清单|todo|to-do|text|markdown)$/i.test(line)) return;
+      if (/^\[\s*\[[\d,\s]+\]\s*\]$/.test(line)) return;
       if (/^(语文|数学|英语|道法|科学|体育|音乐|美术)\s*[:：]?$/.test(line)) return;
       if (/^\d{1,4}[./年-]\d{1,2}([./月-]\d{1,2})?日?$/.test(line)) return;
       var parts = line.split(/[;；。]+/);
@@ -10941,25 +10955,24 @@ html.is-static .ocr-progress span{transition:none}
 
   async function runAiOcr() {
     var ai = state.ocr.ai;
-    if (!ai.apiKey) throw new Error('还没有配置 DeepSeek API Key');
+    if (!ai.apiKey) throw new Error('还没有配置 SiliconFlow API Key');
     setOcrProgress(10, '准备图片', '正在读取扫描图…');
     var dataUrl = await ocrImageDataUrl();
-    setOcrProgress(30, 'AI 识别中', '正在直接调用 DeepSeek…');
+    setOcrProgress(30, 'DeepSeek-OCR 识别中', '正在调用 SiliconFlow…');
     var base = String(ai.base || OCR_AI_DEFAULTS.base).replace(/\/+$/, '');
     var endpoint = /\/chat\/completions$/.test(base) ? base : base + '/chat/completions';
-    var prompt = '请逐行转录这张中文手写作业清单照片中的文字。这是学生作业清单，常见词包括：准备、预习、复习、摘抄、随笔、周记、家听、课听、改卷、背课文、跳绳、打疫苗。要求：按左右两栏的视觉行分别转录，不要合并两栏；保留数字编号和勾选框（☑/□）；只看图片，不要猜测，看不清的字写「□」；只输出转录文字，不要解释。';
+    var prompt = '<image>\n<|grounding|>Convert the document to markdown.';
     var body = {
       model: ai.model || OCR_AI_DEFAULTS.model,
       messages: [{
         role: 'user',
         content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: dataUrl, detail: 'original' } }
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          { type: 'text', text: prompt }
         ]
       }],
-      thinking: { type: 'disabled' },
       temperature: 0,
-      max_tokens: 2000
+      max_tokens: 2048
     };
     var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     var timer = null;
@@ -10983,17 +10996,63 @@ html.is-static .ocr-progress span{transition:none}
     try { json = raw ? JSON.parse(raw) : null; } catch (e) { json = null; }
     if (!response.ok) {
       var detail = json && (json.error && (json.error.message || json.error.code) || json.message) || raw.slice(0, 180);
-      throw new Error('DeepSeek 返回 ' + response.status + (detail ? '：' + detail : ''));
+      throw new Error('SiliconFlow 返回 ' + response.status + (detail ? '：' + detail : ''));
     }
     var content = json && json.choices && json.choices[0] && json.choices[0].message
       ? json.choices[0].message.content : '';
     if (Array.isArray(content)) {
       content = content.map(function (part) { return part && part.text ? part.text : ''; }).filter(Boolean).join('\n');
     }
-    content = String(content || '').replace(/^\s*```[\w-]*\s*/, '').replace(/\s*```\s*$/, '').trim();
-    if (!content) throw new Error('DeepSeek 没有返回文字');
+    content = String(content || '')
+      .replace(/<\|[^>]*\|>/g, '')
+      .replace(/\[\s*\[[\d,\s]+\]\s*\]/g, '')
+      .replace(/^\s*```[\w-]*\s*/, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+    if (!content) throw new Error('SiliconFlow 没有返回文字');
     setOcrProgress(90, 'AI 识别完成', '正在整理待办…');
     return normalizeOcrText(content);
+  }
+
+  async function testAiOcrConnection() {
+    var ai = state.ocr.ai;
+    var btn = $('aiOcrTestBtn');
+    if (!ai.apiKey) {
+      toast('还没有 API Key', { text: '先填入 SiliconFlow Key。', tone: 'neutral' });
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = '测试中…'; }
+    try {
+      var base = String(ai.base || OCR_AI_DEFAULTS.base).replace(/\/+$/, '');
+      var endpoint = /\/chat\/completions$/.test(base) ? base : base + '/chat/completions';
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = null;
+      if (controller) timer = setTimeout(function () { controller.abort(); }, 30000);
+      var response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ai.apiKey },
+          body: JSON.stringify({
+            model: ai.model || OCR_AI_DEFAULTS.model,
+            messages: [{ role: 'user', content: '只回复 OK' }],
+            max_tokens: 8
+          }),
+          signal: controller ? controller.signal : undefined
+        });
+      } finally { if (timer) clearTimeout(timer); }
+      var raw = await response.text();
+      if (!response.ok) {
+        var detail = raw.slice(0, 200);
+        try { var j = JSON.parse(raw); detail = j.error && (j.error.message || j.error.code) || detail; } catch (e) { }
+        throw new Error('HTTP ' + response.status + '：' + detail);
+      }
+      toast('SiliconFlow 连接正常', { text: 'HTTP 200 · ' + (ai.model || 'deepseek-ai/DeepSeek-OCR'), icon: icon('check'), tone: 'success', duration: 5000 });
+    } catch (err) {
+      toast('SiliconFlow 连接失败', { text: (err && err.message) || String(err), tone: 'danger', duration: 7000 });
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '测试 SiliconFlow 连接'; }
+    }
   }
 
   async function runTencentOcr() {
@@ -11480,6 +11539,7 @@ html.is-static .ocr-progress span{transition:none}
       var el = $(id);
       if (el) el.addEventListener('input', scheduleAiConfigSave);
     });
+    if ($('aiOcrTestBtn')) $('aiOcrTestBtn').addEventListener('click', testAiOcrConnection);
     ['tencentOcrEnabled', 'tencentBackend'].forEach(function (id) {
       var el = $(id);
       if (el) el.addEventListener('change', function () { updateTencentConfigFromForm(false); });
@@ -11694,7 +11754,7 @@ html.is-static .ocr-progress span{transition:none}
     openOcrModal: openOcrModal,
     parseOcrTasks: parseOcrTasks,
     importOcrTasks: importOcrTasks,
-    version: '1.1.0'
+    version: '1.4.0'
   };
 
   boot();
