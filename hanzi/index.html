@@ -15,6 +15,7 @@
     <input id="search" type="search" placeholder="搜索汉字 / 拼音">
     <label class="chk"><input type="checkbox" id="onlyUndone"> 只看未练</label>
     <button id="testBtn" class="testbtn" type="button">测试模式</button>
+    <button id="dictationBtn" class="testbtn" type="button">默写模式</button>
     <span id="progress" class="progress"></span>
   </div>
 </header>
@@ -64,6 +65,61 @@
   </div>
 </div>
 
+<div id="dictationView" class="dictview hidden">
+  <div id="dictSet" class="dictsetup">
+    <h2>默写模式 · 田字格听写</h2>
+    <div class="trow">
+      <label>年级 <select id="dictGrade"></select></label>
+      <label>顺序 <select id="dictOrder">
+        <option value="sequential">教材顺序</option>
+        <option value="random">随机打乱</option>
+      </select></label>
+      <span class="thint">只看拼音与提示词，用鼠标或手指在田字格中书写，笔顺与位置都要写对</span>
+    </div>
+    <div id="dictUnitList" class="unitlist"></div>
+    <div class="tactions">
+      <button id="startDict" class="primary" type="button">开始默写</button>
+      <button id="dictBack" type="button">返回</button>
+    </div>
+  </div>
+
+  <div id="dictQuiz" class="dictquiz hidden">
+    <div class="drow">
+      <span id="dictPos" class="tpos"></span>
+      <span id="dictMiss" class="dmiss"></span>
+    </div>
+    <div class="dprompt">
+      <div id="dPinyin" class="d-pinyin"></div>
+      <div id="dHint" class="d-hint"></div>
+      <button id="dSpeak" class="fc-btn" type="button">朗读提示</button>
+    </div>
+    <div id="dWriterWrap" class="d-writerwrap">
+      <div id="dWriter" class="writerbox"></div>
+    </div>
+    <div id="dFeedback" class="dfb hidden"></div>
+    <div class="dactions">
+      <button id="dPrev" type="button">← 上一字</button>
+      <button id="dReset" type="button">重置</button>
+      <button id="dSkip" type="button">跳过 · 看答案</button>
+      <button id="dNext" type="button">下一字 →</button>
+    </div>
+  </div>
+
+  <div id="dictResult" class="dictresult hidden">
+    <h2>默写成绩</h2>
+    <div id="dAccuracy" class="d-accuracy"></div>
+    <div id="dStats" class="d-stats"></div>
+    <div id="dMissedWrap" class="d-missedwrap hidden">
+      <div class="d-missed-title">未通过的字（点击回看笔顺）</div>
+      <div id="dMissed" class="d-missed"></div>
+    </div>
+    <div class="tactions">
+      <button id="dictAgain" class="primary" type="button">再写一组</button>
+      <button id="dictExit" type="button">返回</button>
+    </div>
+  </div>
+</div>
+
 <div id="overlay" class="overlay hidden">
   <div class="modal">
     <button id="closeBtn" class="close" aria-label="关闭">×</button>
@@ -73,9 +129,12 @@
       <div id="mMeta" class="mmeta"></div>
     </div>
     <div id="writerBox" class="writerbox"></div>
+    <div id="mHint" class="m-hint hidden"></div>
+    <div id="mFeedback" class="dfb hidden"></div>
     <div class="mactions">
       <button id="animBtn">演示笔顺</button>
       <button id="quizBtn" class="primary">描红练习</button>
+      <button id="dictateBtn">默写</button>
       <button id="resetBtn">重置</button>
       <button id="speakBtn">朗读</button>
     </div>
