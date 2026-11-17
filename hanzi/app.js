@@ -473,13 +473,19 @@
     if (e.key === 'Escape') exitTest();
   });
 
-  gradeSel.onchange = function () {
-    state.grade = parseInt(gradeSel.value, 10);
+  // 统一设置年级：同步顶部下拉、册切换与主列表（测试/默写设置页共用）
+  function applyGrade(g) {
+    state.grade = g;
     var list = booksFor(state.grade);
     var has = list.some(function (b) { return b.volume === state.volume; });
     if (!has && list.length) state.volume = list[0].volume;
+    gradeSel.value = String(state.grade);
     buildVolTabs();
     render();
+  }
+
+  gradeSel.onchange = function () {
+    applyGrade(parseInt(gradeSel.value, 10));
   };
   searchEl.oninput = function () { state.query = searchEl.value.trim(); render(); };
   onlyUndoneEl.onchange = function () { state.onlyUndone = onlyUndoneEl.checked; render(); };
@@ -942,6 +948,7 @@
   startTestBtn.onclick = startTest;
   testGrade.onchange = function () {
     testState.grade = parseInt(testGrade.value, 10);
+    applyGrade(testState.grade); // 同步顶部主界面年级
     renderUnitList();
   };
   unitList.addEventListener('change', function (e) {
@@ -1029,6 +1036,13 @@
   function enterDictation() {
     cancelSpeech();
     dictState.grade = state.grade;
+    dictGrade.innerHTML = '';
+    testGrades().forEach(function (g) {
+      var o = document.createElement('option');
+      o.value = g;
+      o.textContent = g + ' 年级';
+      dictGrade.appendChild(o);
+    });
     dictGrade.value = String(dictState.grade);
     buildDictUnitList();
     showDictPhase('setup');
@@ -1264,6 +1278,7 @@
   };
   dictGrade.onchange = function () {
     dictState.grade = parseInt(dictGrade.value, 10);
+    applyGrade(dictState.grade); // 同步顶部主界面年级
     buildDictUnitList();
   };
   dictUnitList.addEventListener('change', function (e) {
