@@ -327,14 +327,16 @@
     return HanziWriter.create(target, ch, base);
   }
 
-  // 默写判定参数：严格模式，无轮廓提示，错笔需重写
+  // 默写判定参数：宽松模式，无轮廓提示；位置容错提高、允许倒笔顺，
+  // 同一笔错 3 次后自动判对并继续（仍计入错笔统计）
   var DICT_QUIZ_OPTS = {
     showOutline: false,
     showCharacter: false,
-    acceptBackwardsStrokes: false,
+    acceptBackwardsStrokes: true,
     showHintAfterMisses: 0,
+    markStrokeCorrectAfterMisses: 3,
     highlightOnComplete: true,
-    leniency: 1
+    leniency: 2
   };
 
   function createWriter(ch) {
@@ -489,6 +491,7 @@
   var testSetup = document.getElementById('testSetup');
   var testQuiz = document.getElementById('testQuiz');
   var testGrade = document.getElementById('testGrade');
+  var testScope = document.getElementById('testScope');
   var testOrder = document.getElementById('testOrder');
   var unitList = document.getElementById('unitList');
   var startTestBtn = document.getElementById('startTest');
@@ -506,7 +509,8 @@
   var testExit = document.getElementById('testExit');
 
   var testState = { grade: 1, cards: [], index: 0, flipped: false, writer: null, speakTimer: null };
-  var testUnitSel = {}; // grade -> { unitName: bool }
+  // grade -> { scope: 'unit'|'lesson', sel: { key: bool } }
+  var testUnitSel = {};
 
   function testGrades() {
     var grades = [];
@@ -527,60 +531,111 @@
     testGrade.value = String(testState.grade);
   }
 
-  function testUnits(grade) {
-    var out = [];
-    booksFor(grade).forEach(function (b) {
-      var tag = b.volume === 'up' ? '上' : '下';
-      b.units.forEach(function (u) {
-        out.push({ name: u.name, volume: b.volume, tag: tag });
-      });
-    });
-    return out;
+  /* ---------- 通用范围勾选（单元 / 课文两级，测试与默写共用） ---------- */
+
+  // 取某年级在指定范围下已保存的选择；范围或年级变化时返回空（即默认全不选）
+  function scopeState(selMap, grade, scope) {
+    var rec = selMap[grade];
+    return (rec && rec.scope === scope && rec.sel) ? rec.sel : {};
   }
 
-  // 通用单元勾选列表渲染（测试模式与默写模式共用）
-  function renderUnitListInto(el, grade, selMap) {
-    var units = testUnits(grade);
-    var saved = selMap[grade];
+  function saveScopeSel(el, selMap, grade, scope) {
+    var sel = {};
+    el.querySelectorAll('input[type=checkbox][data-leaf]').forEach(function (cb) {
+      sel[cb.getAttribute('data-unit')] = cb.checked;
+    });
+    selMap[grade] = { scope: scope, sel: sel };
+  }
+
+  function countLeafChecked(el) {
+    return el.querySelectorAll('input[type=checkbox][data-leaf]:checked').length;
+  }
+
+  // 单元标题行复选框：批量勾选/取消该单元下的全部课文
+  function applyHeadToggle(el, headCb) {
+    var unitKey = headCb.getAttribute('data-unit');
+    var cbs = el.querySelectorAll('input[type=checkbox][data-leaf]');
+    for (var i = 0; i < cbs.length; i++) {
+      var key = cbs[i].getAttribute('data-unit') || '';
+      if (key.indexOf(unitKey + '|') === 0) cbs[i].checked = headCb.checked;
+    }
+  }
+
+  function isHeadCheckbox(t) {
+    return !!(t && t.parentElement &&
+      t.parentElement.classList &&
+      t.parentElement.classList.contains('head'));
+  }
+
+  // 通用勾选列表渲染（测试模式与默写模式共用）
+  function renderUnitListInto(el, grade, selMap, scope) {
+    var saved = scopeState(selMap, grade, scope);
+    var books = booksFor(grade);
     el.innerHTML = '';
-    if (!units.length) {
+    if (!books.length) {
       el.innerHTML = '<div class="empty">该年级暂无数据</div>';
       return false;
     }
-    units.forEach(function (u) {
-      var key = u.name + '|' + u.volume;
-      var lab = document.createElement('label');
-      lab.className = 'uitem';
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.setAttribute('data-unit', key);
-      cb.checked = saved ? !!saved[key] : true;
-      var name = document.createElement('span');
-      name.textContent = u.name + '（' + u.tag + '）';
-      lab.appendChild(cb);
-      lab.appendChild(name);
-      el.appendChild(lab);
+    books.forEach(function (b) {
+      var tag = b.volume === 'up' ? '上' : '下';
+      b.units.forEach(function (u) {
+        var unitKey = u.name + '|' + b.volume;
+        if (scope === 'lesson') {
+          var head = document.createElement('label');
+          head.className = 'uitem head';
+          var hcb = document.createElement('input');
+          hcb.type = 'checkbox';
+          hcb.setAttribute('data-unit', unitKey);
+          var lessons = u.lessons || [];
+          hcb.checked = lessons.length > 0 && lessons.every(function (l) {
+            return !!saved[unitKey + '|' + l.no];
+          });
+          var hname = document.createElement('span');
+          hname.textContent = u.name + '（' + tag + '）';
+          head.appendChild(hcb);
+          head.appendChild(hname);
+          el.appendChild(head);
+          lessons.forEach(function (l) {
+            var key = unitKey + '|' + l.no;
+            var lab = document.createElement('label');
+            lab.className = 'uitem lesson';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.setAttribute('data-unit', key);
+            cb.setAttribute('data-leaf', '1');
+            cb.checked = !!saved[key];
+            var name = document.createElement('span');
+            name.textContent = l.no === l.title ? l.title : l.no + ' ' + l.title;
+            lab.appendChild(cb);
+            lab.appendChild(name);
+            el.appendChild(lab);
+          });
+        } else {
+          var lab = document.createElement('label');
+          lab.className = 'uitem';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.setAttribute('data-unit', unitKey);
+          cb.setAttribute('data-leaf', '1');
+          cb.checked = !!saved[unitKey];
+          var name = document.createElement('span');
+          name.textContent = u.name + '（' + tag + '）';
+          lab.appendChild(cb);
+          lab.appendChild(name);
+          el.appendChild(lab);
+        }
+      });
     });
     return true;
   }
 
   function renderUnitList() {
-    renderUnitListInto(unitList, testState.grade, testUnitSel);
+    renderUnitListInto(unitList, testState.grade, testUnitSel, testScope.value);
     updateStartState();
   }
 
-  function saveUnitSel() {
-    var map = {};
-    var cbs = unitList.querySelectorAll('input[type=checkbox]');
-    for (var i = 0; i < cbs.length; i++) {
-      map[cbs[i].getAttribute('data-unit')] = cbs[i].checked;
-    }
-    testUnitSel[testState.grade] = map;
-  }
-
   function updateStartState() {
-    startTestBtn.disabled =
-      !unitList.querySelectorAll('input[type=checkbox]:checked').length;
+    startTestBtn.disabled = !countLeafChecked(unitList);
   }
 
   function shuffle(arr) {
@@ -593,18 +648,17 @@
     return arr;
   }
 
-  function collectTestCards(grade, selectedKeys) {
+  function collectTestCards(grade, selectedKeys, scope) {
     var selected = {};
-    selectedKeys.forEach(function (k) {
-      var parts = k.split('|');
-      if (parts.length === 2) selected[parts[0] + '|' + parts[1]] = true;
-    });
+    selectedKeys.forEach(function (k) { selected[k] = true; });
     var seen = {};
     var out = [];
     booksFor(grade).forEach(function (b) {
       b.units.forEach(function (u) {
-        if (!selected[u.name + '|' + b.volume]) return;
         u.lessons.forEach(function (l) {
+          if (scope === 'lesson') {
+            if (!selected[u.name + '|' + b.volume + '|' + l.no]) return;
+          } else if (!selected[u.name + '|' + b.volume]) return;
           l.chars.forEach(function (c) {
             if (seen[c.c]) return;
             seen[c.c] = true;
@@ -642,10 +696,10 @@
 
   function startTest() {
     var selected = [];
-    unitList.querySelectorAll('input[type=checkbox]:checked').forEach(function (cb) {
+    unitList.querySelectorAll('input[type=checkbox][data-leaf]:checked').forEach(function (cb) {
       selected.push(cb.getAttribute('data-unit'));
     });
-    var cards = collectTestCards(testState.grade, selected);
+    var cards = collectTestCards(testState.grade, selected, testScope.value);
     if (!cards.length) return;
     if (testOrder.value === 'random') shuffle(cards);
     testState.cards = cards;
@@ -890,7 +944,12 @@
     testState.grade = parseInt(testGrade.value, 10);
     renderUnitList();
   };
-  unitList.addEventListener('change', function () { saveUnitSel(); updateStartState(); });
+  unitList.addEventListener('change', function (e) {
+    if (isHeadCheckbox(e.target)) applyHeadToggle(unitList, e.target);
+    saveScopeSel(unitList, testUnitSel, testState.grade, testScope.value);
+    updateStartState();
+  });
+  testScope.onchange = renderUnitList;
   flashCard.onclick = flipCard;
   fcReplay.onclick = function (e) {
     e.stopPropagation();
@@ -917,6 +976,7 @@
   var dictQuiz = document.getElementById('dictQuiz');
   var dictResult = document.getElementById('dictResult');
   var dictGrade = document.getElementById('dictGrade');
+  var dictScope = document.getElementById('dictScope');
   var dictOrder = document.getElementById('dictOrder');
   var dictUnitList = document.getElementById('dictUnitList');
   var startDictBtn = document.getElementById('startDict');
@@ -943,7 +1003,8 @@
     grade: 1, cards: [], index: 0, writer: null,
     misses: 0, done: false, speakTimer: null, advanceTimer: null
   };
-  var dictUnitSel = {}; // grade -> { unitName|volume: bool }
+  // grade -> { scope: 'unit'|'lesson', sel: { key: bool } }
+  var dictUnitSel = {};
 
   function destroyDictWriter() {
     if (dictState.writer) {
@@ -985,30 +1046,20 @@
   }
 
   function buildDictUnitList() {
-    renderUnitListInto(dictUnitList, dictState.grade, dictUnitSel);
+    renderUnitListInto(dictUnitList, dictState.grade, dictUnitSel, dictScope.value);
     updateDictStartState();
   }
 
-  function saveDictUnitSel() {
-    var map = {};
-    var cbs = dictUnitList.querySelectorAll('input[type=checkbox]');
-    for (var i = 0; i < cbs.length; i++) {
-      map[cbs[i].getAttribute('data-unit')] = cbs[i].checked;
-    }
-    dictUnitSel[dictState.grade] = map;
-  }
-
   function updateDictStartState() {
-    startDictBtn.disabled =
-      !dictUnitList.querySelectorAll('input[type=checkbox]:checked').length;
+    startDictBtn.disabled = !countLeafChecked(dictUnitList);
   }
 
   function startDictation() {
     var selected = [];
-    dictUnitList.querySelectorAll('input[type=checkbox]:checked').forEach(function (cb) {
+    dictUnitList.querySelectorAll('input[type=checkbox][data-leaf]:checked').forEach(function (cb) {
       selected.push(cb.getAttribute('data-unit'));
     });
-    var picked = collectTestCards(dictState.grade, selected);
+    var picked = collectTestCards(dictState.grade, selected, dictScope.value);
     if (!picked.length) return;
     if (dictOrder.value === 'random') shuffle(picked);
     dictState.cards = picked.map(function (c) {
@@ -1215,10 +1266,12 @@
     dictState.grade = parseInt(dictGrade.value, 10);
     buildDictUnitList();
   };
-  dictUnitList.addEventListener('change', function () {
-    saveDictUnitSel();
+  dictUnitList.addEventListener('change', function (e) {
+    if (isHeadCheckbox(e.target)) applyHeadToggle(dictUnitList, e.target);
+    saveScopeSel(dictUnitList, dictUnitSel, dictState.grade, dictScope.value);
     updateDictStartState();
   });
+  dictScope.onchange = buildDictUnitList;
   dSpeak.onclick = function () {
     var it = dictState.cards[dictState.index];
     if (!it) return;

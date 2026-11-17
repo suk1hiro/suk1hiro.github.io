@@ -27,11 +27,15 @@
     <h2>测试模式 · 拼音闪卡</h2>
     <div class="trow">
       <label>年级 <select id="testGrade"></select></label>
+      <label>范围 <select id="testScope">
+        <option value="unit">按单元</option>
+        <option value="lesson">按课文</option>
+      </select></label>
       <label>顺序 <select id="testOrder">
         <option value="sequential">教材顺序</option>
         <option value="random">随机打乱</option>
       </select></label>
-      <span id="unitHint" class="thint">勾选要测试的单元（上、下册同名单元分开显示）</span>
+      <span id="unitHint" class="thint">默认不选，勾选要测试的单元或课文（上、下册分开显示）</span>
     </div>
     <div id="unitList" class="unitlist"></div>
     <div class="tactions">
@@ -70,11 +74,15 @@
     <h2>默写模式 · 田字格听写</h2>
     <div class="trow">
       <label>年级 <select id="dictGrade"></select></label>
+      <label>范围 <select id="dictScope">
+        <option value="unit">按单元</option>
+        <option value="lesson">按课文</option>
+      </select></label>
       <label>顺序 <select id="dictOrder">
         <option value="sequential">教材顺序</option>
         <option value="random">随机打乱</option>
       </select></label>
-      <span class="thint">只看拼音与提示词，用鼠标或手指在田字格中书写，笔顺与位置都要写对</span>
+      <span class="thint">默认不选；只看拼音与提示词，用鼠标或手指在田字格中书写</span>
     </div>
     <div id="dictUnitList" class="unitlist"></div>
     <div class="tactions">

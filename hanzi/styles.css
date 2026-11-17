@@ -446,6 +446,21 @@ main {
   height: 16px;
 }
 
+/* 按课文两级勾选：单元标题行 + 缩进课文 */
+.uitem.head {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  font-weight: 600;
+  color: var(--seal2);
+}
+
+.uitem.lesson {
+  margin-left: 20px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 13px;
+}
+
 .uitem .usrc {
   margin-left: auto;
   font-size: 12px;
