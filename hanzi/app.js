@@ -433,7 +433,10 @@
   /* ---------- 自由书写（写完提交）模式 ---------- */
 
   var FREE_SAMPLE_N = 24;       // 笔画重采样点数
-  var FREE_MATCH_THRESH = 0.20; // DTW 匹配阈值（标定：正确书写 ≤0.16，错误书写 ≥0.24）
+  // DTW 匹配阈值：按归一化后笔画长度自适应——短笔画（点/提/短横）对噪声更敏感，适当放宽
+  var FT_BASE = 0.17;           // 长笔画（≥0.6）基础阈值
+  var FT_SHORT_BONUS = 0.10;    // 短笔画放宽上限
+  var FT_REF_LEN = 0.6;         // 长度参考：达到此长度按基础阈值
   var FREE_MIN_LEN = 0.06;      // 有效笔画最短折线长度（忽略误触小点）
 
   // 在田字格容器内挂一块透明画布采集手写笔迹，返回句柄
@@ -605,6 +608,11 @@
     return len;
   }
 
+  // 归一化后按笔画长度计算该笔的匹配阈值
+  function strokeThresh(len) {
+    return FT_BASE + FT_SHORT_BONUS * Math.max(0, 1 - len / FT_REF_LEN);
+  }
+
   // 评估自由书写：与标准笔画贪心最近匹配（不要求笔顺顺序）
   // medians 为 0–1024 坐标系的折线中点序列；过短的笔迹（误触/抖动）忽略
   // 先做整字归一化（用户笔迹整体平移缩放到标准字形包围盒），再逐笔弹性比对
@@ -634,15 +642,17 @@
     }
     var pairs = [], i, j;
     for (i = 0; i < users.length; i++) {
+      var ulen = pathLength(users[i]);
+      var th = strokeThresh(ulen);
       for (j = 0; j < targets.length; j++) {
-        pairs.push({ u: i, m: j, s: strokeScore(users[i], targets[j]) });
+        pairs.push({ u: i, m: j, s: strokeScore(users[i], targets[j]), th: th });
       }
     }
     pairs.sort(function (a, b) { return a.s - b.s; });
     var usedU = {}, usedM = {}, matched = 0, badU = {};
     pairs.forEach(function (p) {
       if (usedU[p.u] || usedM[p.m]) return;
-      if (p.s > FREE_MATCH_THRESH) return;
+      if (p.s > p.th) return;
       usedU[p.u] = true;
       usedM[p.m] = true;
       matched++;
