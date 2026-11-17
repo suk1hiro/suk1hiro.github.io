@@ -433,7 +433,7 @@
   /* ---------- 自由书写（写完提交）模式 ---------- */
 
   var FREE_SAMPLE_N = 24;       // 笔画重采样点数
-  var FREE_MATCH_THRESH = 0.18; // 匹配阈值：对齐后逐点距离 + 中心偏移（归一化坐标）
+  var FREE_MATCH_THRESH = 0.20; // DTW 匹配阈值（标定：正确书写 ≤0.16，错误书写 ≥0.24）
   var FREE_MIN_LEN = 0.06;      // 有效笔画最短折线长度（忽略误触小点）
 
   // 在田字格容器内挂一块透明画布采集手写笔迹，返回句柄
@@ -543,15 +543,18 @@
     return out;
   }
 
-  // 笔画包围盒：中心与对角线长度
-  function strokeBBox(pts) {
-    var x0 = 1, x1 = 0, y0 = 1, y1 = 0, i;
-    for (i = 0; i < pts.length; i++) {
-      if (pts[i][0] < x0) x0 = pts[i][0];
-      if (pts[i][0] > x1) x1 = pts[i][0];
-      if (pts[i][1] < y0) y0 = pts[i][1];
-      if (pts[i][1] > y1) y1 = pts[i][1];
-    }
+  // 计算多笔笔迹的整体包围盒（用于整字归一化）
+  function strokesUnionBBox(strokes) {
+    var x0 = 1, x1 = 0, y0 = 1, y1 = 0;
+    strokes.forEach(function (pts) {
+      for (var i = 0; i < pts.length; i++) {
+        if (pts[i][0] < x0) x0 = pts[i][0];
+        if (pts[i][0] > x1) x1 = pts[i][0];
+        if (pts[i][1] < y0) y0 = pts[i][1];
+        if (pts[i][1] > y1) y1 = pts[i][1];
+      }
+    });
+    if (x1 < x0) return { cx: 0.5, cy: 0.5, d: 1 };
     return {
       cx: (x0 + x1) / 2,
       cy: (y0 + y1) / 2,
@@ -559,35 +562,36 @@
     };
   }
 
-  // 两条等点数折线的逐点平均距离（对形状差异敏感）
-  function meanPointwise(a, b) {
-    var sum = 0, i;
-    for (i = 0; i < a.length; i++) {
-      var dx = a[i][0] - b[i][0];
-      var dy = a[i][1] - b[i][1];
-      sum += Math.sqrt(dx * dx + dy * dy);
+  // DTW 弹性对齐平均距离：容忍起笔收笔伸缩与书写快慢不均
+  // 返回累计代价 / 路径长度（归一化坐标下的平均距离）
+  function dtwDist(a, b) {
+    var n = a.length, m = b.length, i, j;
+    var INF = 1e9;
+    var prev = new Array(m + 1), curr = new Array(m + 1), tmp;
+    prev[0] = 0;
+    for (j = 1; j <= m; j++) prev[j] = INF;
+    for (i = 1; i <= n; i++) {
+      curr[0] = INF;
+      for (j = 1; j <= m; j++) {
+        var dx = a[i - 1][0] - b[j - 1][0];
+        var dy = a[i - 1][1] - b[j - 1][1];
+        var c = Math.sqrt(dx * dx + dy * dy);
+        var best = prev[j];                 // a 走一步
+        if (curr[j - 1] < best) best = curr[j - 1]; // b 走一步
+        if (prev[j - 1] < best) best = prev[j - 1]; // 两者各走一步
+        curr[j] = c + best;
+      }
+      tmp = prev; prev = curr; curr = tmp;
     }
-    return sum / a.length;
+    return prev[m] / n;
   }
 
-  // 笔画相似度：用户笔画按包围盒中心对齐目标、均匀缩放到目标尺寸后逐点比对，
-  // 取正向/反向（起笔端可不同）较小者，再加中心偏移惩罚（保留位置语义）
+  // 笔画相似度：整字归一化后做 DTW 弹性比对，
+  // 取正向/反向（起笔端可不同）较小者
   function strokeScore(u, m) {
-    var bu = strokeBBox(u);
-    var bm = strokeBBox(m);
-    var s = bm.d / bu.d;
-    var aligned = [], rev = [], i;
-    for (i = 0; i < u.length; i++) {
-      aligned.push([
-        bm.cx + (u[i][0] - bu.cx) * s,
-        bm.cy + (u[i][1] - bu.cy) * s
-      ]);
-    }
-    for (i = u.length - 1; i >= 0; i--) {
-      rev.push(aligned[i]);
-    }
-    var cd = Math.sqrt((bu.cx - bm.cx) * (bu.cx - bm.cx) + (bu.cy - bm.cy) * (bu.cy - bm.cy));
-    return Math.min(meanPointwise(aligned, m), meanPointwise(rev, m)) + cd;
+    var n = u.length, i, rev = [];
+    for (i = n - 1; i >= 0; i--) rev.push(u[i]);
+    return Math.min(dtwDist(u, m), dtwDist(rev, m));
   }
 
   // 计算笔画折线总长（归一化坐标）
@@ -603,6 +607,7 @@
 
   // 评估自由书写：与标准笔画贪心最近匹配（不要求笔顺顺序）
   // medians 为 0–1024 坐标系的折线中点序列；过短的笔迹（误触/抖动）忽略
+  // 先做整字归一化（用户笔迹整体平移缩放到标准字形包围盒），再逐笔弹性比对
   function evaluateFreeStrokes(ch, strokes) {
     var rec = HANZI[ch] || {};
     var medians = rec.medians || [];
@@ -616,6 +621,17 @@
       // medians 数据为 y 向上坐标系（0–1024），与画布 y 向下方向相反，需翻转
       return resamplePts(m.map(function (p) { return [p[0] / 1024, 1 - p[1] / 1024]; }), FREE_SAMPLE_N);
     });
+    // 整字归一化：用户整体包围盒 → 目标整体包围盒（统一平移 + 均匀缩放）
+    if (users.length && targets.length) {
+      var bu = strokesUnionBBox(users);
+      var bt = strokesUnionBBox(targets);
+      var s = bt.d / bu.d;
+      users = users.map(function (u) {
+        return u.map(function (p) {
+          return [bt.cx + (p[0] - bu.cx) * s, bt.cy + (p[1] - bu.cy) * s];
+        });
+      });
+    }
     var pairs = [], i, j;
     for (i = 0; i < users.length; i++) {
       for (j = 0; j < targets.length; j++) {
