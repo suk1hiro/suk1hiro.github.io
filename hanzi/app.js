@@ -433,7 +433,8 @@
   /* ---------- 自由书写（写完提交）模式 ---------- */
 
   var FREE_SAMPLE_N = 24;       // 笔画重采样点数
-  var FREE_MATCH_THRESH = 0.16; // 匹配阈值：双向平均距离（归一化坐标）
+  var FREE_MATCH_THRESH = 0.18; // 匹配阈值：对齐后逐点距离 + 中心偏移（归一化坐标）
+  var FREE_MIN_LEN = 0.06;      // 有效笔画最短折线长度（忽略误触小点）
 
   // 在田字格容器内挂一块透明画布采集手写笔迹，返回句柄
   function createFreeWriter(box) {
@@ -458,13 +459,13 @@
     function dot(p) {
       ctx.fillStyle = '#e11d48';
       ctx.beginPath();
-      ctx.arc(p[0] * 300, p[1] * 300, 12, 0, Math.PI * 2);
+      ctx.arc(p[0] * 300, p[1] * 300, 7, 0, Math.PI * 2);
       ctx.fill();
     }
     function lineTo(p) {
       var last = cur[cur.length - 1];
       ctx.strokeStyle = '#e11d48';
-      ctx.lineWidth = 26;
+      ctx.lineWidth = 14;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
@@ -493,7 +494,7 @@
     }
     canvas.addEventListener('pointerup', finish);
     canvas.addEventListener('pointercancel', finish);
-    canvas.addEventListener('pointerleave', finish);
+    // 注意：不监听 pointerleave——已捕获指针，移出画布（写到田字格边缘）不应断笔
 
     return {
       strokes: strokes,
@@ -523,52 +524,97 @@
       return out;
     }
     var step = total / (n - 1);
-    var dist = 0;
+    var need = step; // 距下一个采样点还差的弧长
     for (i = 1; i < pts.length && out.length < n; i++) {
-      var d2 = segs[i - 1];
-      while (dist + d2 >= step && out.length < n && d2 > 0) {
-        var t = (step - dist) / d2;
+      var d2 = segs[i - 1]; // 本段全长
+      var walked = 0;       // 段内已走弧长
+      while (need <= d2 - walked && out.length < n) {
+        var t = (walked + need) / d2;
         out.push([
           pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t,
           pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t
         ]);
-        d2 -= (step - dist);
-        dist = 0;
+        walked += need;
+        need = step;
       }
-      dist += d2;
+      need -= (d2 - walked);
     }
     while (out.length < n) out.push(pts[pts.length - 1].slice());
     return out;
   }
 
-  // 两组点之间的平均最近距离（双向均值）
-  function meanMinDist(a, b) {
-    var sum = 0, i, j;
+  // 笔画包围盒：中心与对角线长度
+  function strokeBBox(pts) {
+    var x0 = 1, x1 = 0, y0 = 1, y1 = 0, i;
+    for (i = 0; i < pts.length; i++) {
+      if (pts[i][0] < x0) x0 = pts[i][0];
+      if (pts[i][0] > x1) x1 = pts[i][0];
+      if (pts[i][1] < y0) y0 = pts[i][1];
+      if (pts[i][1] > y1) y1 = pts[i][1];
+    }
+    return {
+      cx: (x0 + x1) / 2,
+      cy: (y0 + y1) / 2,
+      d: Math.max(0.001, Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)))
+    };
+  }
+
+  // 两条等点数折线的逐点平均距离（对形状差异敏感）
+  function meanPointwise(a, b) {
+    var sum = 0, i;
     for (i = 0; i < a.length; i++) {
-      var best = Infinity;
-      for (j = 0; j < b.length; j++) {
-        var dx = a[i][0] - b[j][0];
-        var dy = a[i][1] - b[j][1];
-        var d = dx * dx + dy * dy;
-        if (d < best) best = d;
-      }
-      sum += Math.sqrt(best);
+      var dx = a[i][0] - b[i][0];
+      var dy = a[i][1] - b[i][1];
+      sum += Math.sqrt(dx * dx + dy * dy);
     }
     return sum / a.length;
   }
 
+  // 笔画相似度：用户笔画按包围盒中心对齐目标、均匀缩放到目标尺寸后逐点比对，
+  // 取正向/反向（起笔端可不同）较小者，再加中心偏移惩罚（保留位置语义）
   function strokeScore(u, m) {
-    return (meanMinDist(u, m) + meanMinDist(m, u)) / 2;
+    var bu = strokeBBox(u);
+    var bm = strokeBBox(m);
+    var s = bm.d / bu.d;
+    var aligned = [], rev = [], i;
+    for (i = 0; i < u.length; i++) {
+      aligned.push([
+        bm.cx + (u[i][0] - bu.cx) * s,
+        bm.cy + (u[i][1] - bu.cy) * s
+      ]);
+    }
+    for (i = u.length - 1; i >= 0; i--) {
+      rev.push(aligned[i]);
+    }
+    var cd = Math.sqrt((bu.cx - bm.cx) * (bu.cx - bm.cx) + (bu.cy - bm.cy) * (bu.cy - bm.cy));
+    return Math.min(meanPointwise(aligned, m), meanPointwise(rev, m)) + cd;
+  }
+
+  // 计算笔画折线总长（归一化坐标）
+  function pathLength(pts) {
+    var len = 0, i;
+    for (i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - pts[i - 1][0];
+      var dy = pts[i][1] - pts[i - 1][1];
+      len += Math.sqrt(dx * dx + dy * dy);
+    }
+    return len;
   }
 
   // 评估自由书写：与标准笔画贪心最近匹配（不要求笔顺顺序）
-  // medians 为 0–1024 坐标系的折线中点序列
+  // medians 为 0–1024 坐标系的折线中点序列；过短的笔迹（误触/抖动）忽略
   function evaluateFreeStrokes(ch, strokes) {
     var rec = HANZI[ch] || {};
     var medians = rec.medians || [];
-    var users = strokes.map(function (s) { return resamplePts(s, FREE_SAMPLE_N); });
+    var users = [];
+    strokes.forEach(function (s) {
+      if (pathLength(s) >= FREE_MIN_LEN) {
+        users.push(resamplePts(s, FREE_SAMPLE_N));
+      }
+    });
     var targets = medians.map(function (m) {
-      return resamplePts(m.map(function (p) { return [p[0] / 1024, p[1] / 1024]; }), FREE_SAMPLE_N);
+      // medians 数据为 y 向上坐标系（0–1024），与画布 y 向下方向相反，需翻转
+      return resamplePts(m.map(function (p) { return [p[0] / 1024, 1 - p[1] / 1024]; }), FREE_SAMPLE_N);
     });
     var pairs = [], i, j;
     for (i = 0; i < users.length; i++) {
