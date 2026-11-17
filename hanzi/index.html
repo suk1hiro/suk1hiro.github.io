@@ -78,11 +78,15 @@
         <option value="unit">按单元</option>
         <option value="lesson">按课文</option>
       </select></label>
+      <label>笔顺 <select id="dictStrokeCheck">
+        <option value="on">逐笔判定</option>
+        <option value="off">写完提交</option>
+      </select></label>
       <label>顺序 <select id="dictOrder">
         <option value="sequential">教材顺序</option>
         <option value="random">随机打乱</option>
       </select></label>
-      <span class="thint">默认不选；只看拼音与提示词，用鼠标或手指在田字格中书写</span>
+      <span class="thint">默认不选；逐笔判定 = 边写边判笔顺位置，写完提交 = 自由书写后一键检查（不要求笔顺）</span>
     </div>
     <div id="dictUnitList" class="unitlist"></div>
     <div class="tactions">
@@ -108,6 +112,7 @@
     <div class="dactions">
       <button id="dPrev" type="button">← 上一字</button>
       <button id="dReset" type="button">重置</button>
+      <button id="dSubmit" class="primary" type="button">提交检查</button>
       <button id="dSkip" type="button">跳过 · 看答案</button>
       <button id="dNext" type="button">下一字 →</button>
     </div>
@@ -143,6 +148,7 @@
       <button id="animBtn">演示笔顺</button>
       <button id="quizBtn" class="primary">描红练习</button>
       <button id="dictateBtn">默写</button>
+      <button id="mSubmit" class="primary hidden">提交检查</button>
       <button id="resetBtn">重置</button>
       <button id="speakBtn">朗读</button>
     </div>

@@ -3,6 +3,7 @@
   var HANZI = window.HANZI_DATA || {};
   var STORE_KEY = 'hanzi.progress.v1';
   var DICT_KEY = 'hanzi.dictation.v1';
+  var DICT_SET_KEY = 'hanzi.dictation.settings.v1';
 
   var gradeSel = document.getElementById('gradeSel');
   var volTabs = document.getElementById('volTabs');
@@ -24,6 +25,7 @@
   var dictateBtn = document.getElementById('dictateBtn');
   var mHint = document.getElementById('mHint');
   var mFeedback = document.getElementById('mFeedback');
+  var mSubmit = document.getElementById('mSubmit');
   var prevBtn = document.getElementById('prevBtn');
   var nextBtn = document.getElementById('nextBtn');
   var posLabel = document.getElementById('posLabel');
@@ -39,6 +41,8 @@
   var modalBook = null;
   var modalMode = 'trace'; // 'trace' 描红 | 'dictate' 默写
   var modalMisses = 0;
+  var modalDone = false;
+  var modalFreeWriter = null;
   var modalSpeakTimer = null;
 
   function loadProgress() {
@@ -64,6 +68,19 @@
     rec.t = Date.now();
     dictStats[key] = rec;
     saveDictStats();
+  }
+
+  // 默写判定方式设置：on = 逐笔判定（边写边判），off = 写完提交（自由书写）
+  function loadDictSettings() {
+    try { return JSON.parse(localStorage.getItem(DICT_SET_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  var dictSettings = loadDictSettings();
+  function saveDictSettings() {
+    try { localStorage.setItem(DICT_SET_KEY, JSON.stringify(dictSettings)); } catch (e) {}
+  }
+  function strokeCheckMode() {
+    return dictSettings.strokeCheck === 'off' ? 'off' : 'on';
   }
   function keyOf(book, ch) { return book.label + '|' + ch; }
 
@@ -254,6 +271,8 @@
   function setModalMode(mode) {
     modalMode = mode;
     modalMisses = 0;
+    modalDone = false;
+    modalFreeWriter = null;
     if (modalSpeakTimer) { clearTimeout(modalSpeakTimer); modalSpeakTimer = null; }
     var it = modalItem;
     if (!it) return;
@@ -268,19 +287,26 @@
       quizBtn.classList.add('hidden');
       dictateBtn.textContent = '退出默写';
       setModalFeedback('');
-      createDictWriter(it.c, {
-        onMistake: function (d) {
-          modalMisses++;
-          setModalFeedback('第 ' + (d.strokeNum + 1) + ' 笔不对，请重写', 'bad');
-        },
-        onComplete: function () {
-          setModalFeedback('写对了！', 'good');
-          if (modalBook && modalItem) {
-            markDone();
-            recordDictation(keyOf(modalBook, modalItem.c), true, modalMisses);
+      if (strokeCheckMode() === 'off') {
+        // 写完提交：自由书写，点“提交检查”后整字比对（不要求笔顺）
+        mSubmit.classList.remove('hidden');
+        modalFreeWriter = createFreeWriter(writerBox);
+      } else {
+        mSubmit.classList.add('hidden');
+        createDictWriter(it.c, {
+          onMistake: function (d) {
+            modalMisses++;
+            setModalFeedback('第 ' + (d.strokeNum + 1) + ' 笔不对，请重写', 'bad');
+          },
+          onComplete: function () {
+            setModalFeedback('写对了！', 'good');
+            if (modalBook && modalItem) {
+              markDone();
+              recordDictation(keyOf(modalBook, modalItem.c), true, modalMisses);
+            }
           }
-        }
-      });
+        });
+      }
       cancelSpeech();
       var hints = hintsFor(it.c, it.p || '');
       if (hints.length) {
@@ -292,11 +318,39 @@
       mMeta.textContent = [it.unit || '', it.lesson || '',
         rec.strokeCount ? rec.strokeCount + '画' : ''].filter(Boolean).join(' · ');
       mHint.classList.add('hidden');
+      mSubmit.classList.add('hidden');
       animBtn.classList.remove('hidden');
       quizBtn.classList.remove('hidden');
       dictateBtn.textContent = '默写';
       setModalFeedback('');
       createWriter(it.c);
+    }
+  }
+
+  // 弹窗提交检查：整字比对笔迹与标准笔画
+  function submitModalFree() {
+    var it = modalItem;
+    if (!it || modalMode !== 'dictate' || modalDone || !modalFreeWriter) return;
+    var res = evaluateFreeStrokes(it.c, modalFreeWriter.strokes);
+    if (!res.targetCount) {
+      setModalFeedback('暂无笔顺数据，无法判定', 'bad');
+      return;
+    }
+    if (res.ok) {
+      modalDone = true;
+      setModalFeedback('写对了！', 'good');
+      if (modalBook) {
+        markDone();
+        recordDictation(keyOf(modalBook, it.c), true, 0);
+      }
+      // 揭晓：切换到描红视图播放标准笔顺
+      setTimeout(function () {
+        if (modalItem === it && modalMode === 'dictate') setModalMode('trace');
+      }, 900);
+    } else if (res.userCount !== res.targetCount) {
+      setModalFeedback('笔画数不对：应 ' + res.targetCount + ' 画，写了 ' + res.userCount + ' 画', 'bad');
+    } else {
+      setModalFeedback('有 ' + res.badCount + ' 笔不对，请修改后重新提交', 'bad');
     }
   }
 
@@ -376,6 +430,170 @@
     w.quiz(quizOpts);
   }
 
+  /* ---------- 自由书写（写完提交）模式 ---------- */
+
+  var FREE_SAMPLE_N = 24;       // 笔画重采样点数
+  var FREE_MATCH_THRESH = 0.16; // 匹配阈值：双向平均距离（归一化坐标）
+
+  // 在田字格容器内挂一块透明画布采集手写笔迹，返回句柄
+  function createFreeWriter(box) {
+    box.innerHTML = '';
+    var canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 300;
+    canvas.className = 'freecanvas';
+    box.appendChild(canvas);
+    var ctx = canvas.getContext('2d');
+    var strokes = [];
+    var cur = null;
+    var drawing = false;
+
+    function pt(e) {
+      var r = canvas.getBoundingClientRect();
+      return [
+        Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+        Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+      ];
+    }
+    function dot(p) {
+      ctx.fillStyle = '#e11d48';
+      ctx.beginPath();
+      ctx.arc(p[0] * 300, p[1] * 300, 12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    function lineTo(p) {
+      var last = cur[cur.length - 1];
+      ctx.strokeStyle = '#e11d48';
+      ctx.lineWidth = 26;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(last[0] * 300, last[1] * 300);
+      ctx.lineTo(p[0] * 300, p[1] * 300);
+      ctx.stroke();
+    }
+    canvas.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
+      drawing = true;
+      cur = [pt(e)];
+      dot(cur[0]);
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (!drawing) return;
+      var p = pt(e);
+      lineTo(p);
+      cur.push(p);
+    });
+    function finish() {
+      if (!drawing) return;
+      drawing = false;
+      if (cur && cur.length) strokes.push(cur);
+      cur = null;
+    }
+    canvas.addEventListener('pointerup', finish);
+    canvas.addEventListener('pointercancel', finish);
+    canvas.addEventListener('pointerleave', finish);
+
+    return {
+      strokes: strokes,
+      clear: function () {
+        strokes.length = 0;
+        cur = null;
+        drawing = false;
+        ctx.clearRect(0, 0, 300, 300);
+      }
+    };
+  }
+
+  // 折线等弧长重采样为 n 个点
+  function resamplePts(pts, n) {
+    if (!pts.length) return [];
+    var out = [pts[0].slice()];
+    var segs = [], total = 0, i;
+    for (i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - pts[i - 1][0];
+      var dy = pts[i][1] - pts[i - 1][1];
+      var d = Math.sqrt(dx * dx + dy * dy);
+      segs.push(d);
+      total += d;
+    }
+    if (total === 0) {
+      for (i = 1; i < n; i++) out.push(pts[0].slice());
+      return out;
+    }
+    var step = total / (n - 1);
+    var dist = 0;
+    for (i = 1; i < pts.length && out.length < n; i++) {
+      var d2 = segs[i - 1];
+      while (dist + d2 >= step && out.length < n && d2 > 0) {
+        var t = (step - dist) / d2;
+        out.push([
+          pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t,
+          pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t
+        ]);
+        d2 -= (step - dist);
+        dist = 0;
+      }
+      dist += d2;
+    }
+    while (out.length < n) out.push(pts[pts.length - 1].slice());
+    return out;
+  }
+
+  // 两组点之间的平均最近距离（双向均值）
+  function meanMinDist(a, b) {
+    var sum = 0, i, j;
+    for (i = 0; i < a.length; i++) {
+      var best = Infinity;
+      for (j = 0; j < b.length; j++) {
+        var dx = a[i][0] - b[j][0];
+        var dy = a[i][1] - b[j][1];
+        var d = dx * dx + dy * dy;
+        if (d < best) best = d;
+      }
+      sum += Math.sqrt(best);
+    }
+    return sum / a.length;
+  }
+
+  function strokeScore(u, m) {
+    return (meanMinDist(u, m) + meanMinDist(m, u)) / 2;
+  }
+
+  // 评估自由书写：与标准笔画贪心最近匹配（不要求笔顺顺序）
+  // medians 为 0–1024 坐标系的折线中点序列
+  function evaluateFreeStrokes(ch, strokes) {
+    var rec = HANZI[ch] || {};
+    var medians = rec.medians || [];
+    var users = strokes.map(function (s) { return resamplePts(s, FREE_SAMPLE_N); });
+    var targets = medians.map(function (m) {
+      return resamplePts(m.map(function (p) { return [p[0] / 1024, p[1] / 1024]; }), FREE_SAMPLE_N);
+    });
+    var pairs = [], i, j;
+    for (i = 0; i < users.length; i++) {
+      for (j = 0; j < targets.length; j++) {
+        pairs.push({ u: i, m: j, s: strokeScore(users[i], targets[j]) });
+      }
+    }
+    pairs.sort(function (a, b) { return a.s - b.s; });
+    var usedU = {}, usedM = {}, matched = 0, badU = {};
+    pairs.forEach(function (p) {
+      if (usedU[p.u] || usedM[p.m]) return;
+      if (p.s > FREE_MATCH_THRESH) return;
+      usedU[p.u] = true;
+      usedM[p.m] = true;
+      matched++;
+    });
+    for (i = 0; i < users.length; i++) if (!usedU[i]) badU[i] = true;
+    return {
+      ok: medians.length > 0 && users.length === medians.length && matched === medians.length,
+      userCount: users.length,
+      targetCount: medians.length,
+      badCount: Object.keys(badU).length
+    };
+  }
+
   function markDone() {
     if (!modalItem || !modalBook) return;
     progress[keyOf(modalBook, modalItem.c)] = true;
@@ -409,6 +627,7 @@
     if (!modalItem) return;
     setModalMode(modalMode === 'dictate' ? 'trace' : 'dictate');
   };
+  mSubmit.onclick = submitModalFree;
   quizBtn.onclick = function () {
     if (!writer) return;
     writer.quiz({
@@ -985,6 +1204,7 @@
   var dictGrade = document.getElementById('dictGrade');
   var dictScope = document.getElementById('dictScope');
   var dictOrder = document.getElementById('dictOrder');
+  var dictStrokeCheck = document.getElementById('dictStrokeCheck');
   var dictUnitList = document.getElementById('dictUnitList');
   var startDictBtn = document.getElementById('startDict');
   var dictBackBtn = document.getElementById('dictBack');
@@ -997,6 +1217,7 @@
   var dFeedback = document.getElementById('dFeedback');
   var dPrev = document.getElementById('dPrev');
   var dReset = document.getElementById('dReset');
+  var dSubmit = document.getElementById('dSubmit');
   var dSkip = document.getElementById('dSkip');
   var dNext = document.getElementById('dNext');
   var dAccuracy = document.getElementById('dAccuracy');
@@ -1018,6 +1239,7 @@
       try { dictState.writer.cancelQuiz(); } catch (e) {}
       dictState.writer = null;
     }
+    dictState.freeWriter = null;
     dWriter.innerHTML = '';
     dWriter.classList.remove('miss', 'pass');
   }
@@ -1120,7 +1342,13 @@
     var hints = hintsFor(it.c, it.p || '');
     dSpeak.disabled = !('speechSynthesis' in window) || !hints.length;
     setDictFeedback(it.status === 'pending' ? '' : dictStatusText(it), '');
-    mountDictWriter(it);
+    if (strokeCheckMode() === 'off') {
+      dSubmit.classList.remove('hidden');
+      mountFreeDict(it);
+    } else {
+      dSubmit.classList.add('hidden');
+      mountDictWriter(it);
+    }
     if (hints.length) {
       dictState.speakTimer = setTimeout(function () {
         speakHints(it.c, hints, true);
@@ -1163,6 +1391,78 @@
     setTimeout(function () { dWriter.classList.remove('miss'); }, 420);
   }
 
+  // 写完提交模式：挂载自由书写画布
+  function mountFreeDict(it) {
+    destroyDictWriter();
+    clearDictTimers();
+    dictState.misses = 0;
+    dictState.done = false;
+    dictMissEl.textContent = '错笔 0';
+    var rec = HANZI[it.c] || {};
+    if (!rec.medians || !rec.medians.length) {
+      dWriter.innerHTML = '<div class="fc-fallback">暂无笔顺，请跳过</div>';
+      return;
+    }
+    dictState.freeWriter = createFreeWriter(dWriter);
+  }
+
+  // 写完提交模式：揭晓标准字形（按笔顺动画展示）
+  function revealDictChar(it) {
+    destroyDictWriter();
+    var target = document.createElement('div');
+    dWriter.appendChild(target);
+    dictState.writer = makeWriter(target, it.c, {
+      showOutline: false,
+      showCharacter: true,
+      drawingColor: '#e11d48',
+      drawingWidth: 28
+    });
+    try { dictState.writer.animateCharacter(); } catch (e) {}
+  }
+
+  // 写完提交模式：整字比对
+  function submitFreeDict(it) {
+    if (dictState.done || !dictState.freeWriter) return;
+    var res = evaluateFreeStrokes(it.c, dictState.freeWriter.strokes);
+    if (!res.targetCount) {
+      setDictFeedback('暂无笔顺数据，无法判定', 'bad');
+      return;
+    }
+    if (res.ok) {
+      dictState.done = true;
+      dictState.misses = 0;
+      dictMissEl.textContent = '错笔 0';
+      dWriter.classList.add('pass');
+      setDictFeedback('写对了！', 'good');
+      if (it.status === 'pending') {
+        it.status = 'first';
+        it.mistakes = 0;
+        recordDictation(it.book + '|' + it.c, true, 0);
+        markCardDone(it);
+      }
+      revealDictChar(it);
+      clearDictTimers();
+      dictState.advanceTimer = setTimeout(nextDictChar, 1100);
+    } else {
+      var msg;
+      if (res.userCount !== res.targetCount) {
+        msg = '笔画数不对：应 ' + res.targetCount + ' 画，写了 ' + res.userCount + ' 画';
+      } else {
+        msg = '有 ' + res.badCount + ' 笔不对，请修改后重新提交';
+      }
+      dictState.misses = res.userCount !== res.targetCount
+        ? Math.abs(res.userCount - res.targetCount)
+        : res.badCount;
+      dictMissEl.textContent = '错笔 ' + dictState.misses;
+      setDictFeedback(msg, 'bad');
+      flashDictMiss();
+      if (it.status === 'pending') {
+        it.status = 'corrected';
+        recordDictation(it.book + '|' + it.c, false, res.badCount);
+      }
+    }
+  }
+
   function markCardDone(it) {
     if (!it) return;
     progress[it.book + '|' + it.c] = true;
@@ -1197,8 +1497,9 @@
       it.status = 'skipped';
       recordDictation(it.book + '|' + it.c, false, dictState.misses);
     }
-    if (reveal && dictState.writer) {
-      try { dictState.writer.showCharacter(); } catch (e) {}
+    if (reveal) {
+      if (dictState.freeWriter || !dictState.writer) revealDictChar(it);
+      else { try { dictState.writer.showCharacter(); } catch (e) {} }
     }
     setDictFeedback(reveal ? '未通过，可看笔顺后继续' : '未通过', 'bad');
     dictState.advanceTimer = setTimeout(nextDictChar, reveal ? 1400 : 600);
@@ -1287,6 +1588,11 @@
     updateDictStartState();
   });
   dictScope.onchange = buildDictUnitList;
+  dictStrokeCheck.value = strokeCheckMode();
+  dictStrokeCheck.onchange = function () {
+    dictSettings.strokeCheck = dictStrokeCheck.value;
+    saveDictSettings();
+  };
   dSpeak.onclick = function () {
     var it = dictState.cards[dictState.index];
     if (!it) return;
@@ -1298,7 +1604,12 @@
     var it = dictState.cards[dictState.index];
     if (!it || dictState.done) return;
     setDictFeedback('');
-    mountDictWriter(it);
+    if (strokeCheckMode() === 'off') mountFreeDict(it);
+    else mountDictWriter(it);
+  };
+  dSubmit.onclick = function () {
+    var it = dictState.cards[dictState.index];
+    if (it) submitFreeDict(it);
   };
   dSkip.onclick = function () { skipDictChar(true); };
   dNext.onclick = function () {
