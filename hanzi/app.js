@@ -1468,7 +1468,8 @@
     dictState.freeWriter = createFreeWriter(dWriter);
   }
 
-  // 写完提交模式：揭晓标准字形（按笔顺动画展示）
+  // 写完提交模式：揭晓标准字形（静态展示，不播笔顺动画——避免自动前进时一闪而过；
+  // 想看笔顺可在揭晓后点"演示笔顺"或回主界面操作）
   function revealDictChar(it) {
     destroyDictWriter();
     var target = document.createElement('div');
@@ -1479,7 +1480,7 @@
       drawingColor: '#e11d48',
       drawingWidth: 28
     });
-    try { dictState.writer.animateCharacter(); } catch (e) {}
+    try { dictState.writer.showCharacter(); } catch (e) {}
   }
 
   // 写完提交模式：整字比对
@@ -1503,8 +1504,9 @@
         markCardDone(it);
       }
       revealDictChar(it);
+      dWriter.classList.add('pass'); // reveal 内部 destroy 会清样式，这里补回
       clearDictTimers();
-      dictState.advanceTimer = setTimeout(nextDictChar, 1100);
+      dictState.advanceTimer = setTimeout(nextDictChar, 2200);
     } else {
       var msg;
       if (res.userCount !== res.targetCount) {
