@@ -661,10 +661,39 @@ main {
   cursor: default;
 }
 
+/* ---------- 移动端：测试答题页一屏适配（无需上下滚动） ---------- */
 @media (max-width: 520px) {
-  .flashcard { height: 390px; }
-  .fc-char { font-size: 72px; }
+  /* 答题态：折叠顶栏控件（退出测试在导航栏），答题页占满视口 */
+  .topbar:has(~ .testview .testquiz:not(.hidden)) .controls { display: none; }
+  .topbar:has(~ .testview .testquiz:not(.hidden)) { padding: 10px 14px; }
+  .testview:has(.testquiz:not(.hidden)) {
+    padding: 8px 10px 10px;
+    max-width: none;
+  }
+  .testview:has(.testquiz:not(.hidden)) .testquiz {
+    min-height: calc(100dvh - 70px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .tpos { font-size: 13px; margin-bottom: 0; }
+  .flashcard {
+    height: min(calc(100dvh - 170px), 390px);
+    width: min(340px, calc(100vw - 28px));
+    touch-action: manipulation; /* 保留点击翻卡，阻止拖拽传导页面滚动 */
+  }
+  .card-face { gap: 8px; padding: 12px; }
+  .fc-char { font-size: 64px; }
   .fc-pinyin { font-size: 32px; }
+  .fc-writer {
+    width: min(140px, 44vw);
+    height: min(140px, 44vw);
+    touch-action: none; /* 描红书写时避免页面滚动 */
+  }
+  .tnav { margin-top: 0; gap: 8px; width: 100%; justify-content: center; }
+  .tnav button { padding: 9px 10px; flex: 0 1 auto; }
 }
 
 /* ---------- 默写模式 ---------- */

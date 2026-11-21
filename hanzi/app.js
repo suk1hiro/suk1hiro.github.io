@@ -381,16 +381,15 @@
     return HanziWriter.create(target, ch, base);
   }
 
-  // 默写判定参数：宽松模式，无轮廓提示；位置容错提高、允许倒笔顺，
-  // 同一笔错 3 次后自动判对并继续（仍计入错笔统计）
+  // 默写判定参数：严格模式，无轮廓提示；允许倒笔顺（笔顺方向的宽容，与乱点无关），
+  // 不自动判对——写错必须重写该笔，位置容错为 Hanzi Writer 标准值
   var DICT_QUIZ_OPTS = {
     showOutline: false,
     showCharacter: false,
     acceptBackwardsStrokes: true,
     showHintAfterMisses: 0,
-    markStrokeCorrectAfterMisses: 3,
     highlightOnComplete: true,
-    leniency: 2
+    leniency: 1
   };
 
   function createWriter(ch) {
