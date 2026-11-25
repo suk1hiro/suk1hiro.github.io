@@ -55,6 +55,14 @@ body {
   letter-spacing: 0;
 }
 
+/* 版本标注（含日期，便于核对线上版本） */
+.appver {
+  font-size: 11px !important;
+  color: var(--ink2);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -963,8 +971,41 @@ main {
   color: var(--ink2);
 }
 
+/* ---------- 移动端：默写答题页一屏适配（无需上下滚动） ---------- */
 @media (max-width: 520px) {
   .d-pinyin { font-size: 28px; }
   .d-accuracy { font-size: 52px; }
   .dactions button { padding: 10px 12px; }
+  /* 答题态：折叠顶栏控件（返回在成绩页/退出按钮），答题页占满视口 */
+  .topbar:has(~ .dictview .dictquiz:not(.hidden)) .controls { display: none; }
+  .topbar:has(~ .dictview .dictquiz:not(.hidden)) { padding: 10px 14px; }
+  .dictview:has(.dictquiz:not(.hidden)) {
+    padding: 8px 10px 10px;
+    max-width: none;
+  }
+  .dictview:has(.dictquiz:not(.hidden)) .dictquiz {
+    min-height: calc(100dvh - 70px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .drow { margin-bottom: 0; }
+  .d-pinyin { line-height: 1; }
+  /* 提示词最多两行，超出截断，保证田字格与按钮在一屏内 */
+  .dictquiz .d-hint {
+    max-height: 56px;
+    overflow: hidden;
+    margin-bottom: 0;
+  }
+  .dictquiz .dprompt .fc-btn { display: none; } /* 朗读提示按钮占空间，答题态隐藏 */
+  /* 田字格按视口自适应收缩 */
+  .dictquiz .writerbox {
+    width: min(calc(100dvh - 340px), 300px, calc(100vw - 30px));
+    height: min(calc(100dvh - 340px), 300px, calc(100vw - 30px));
+  }
+  .dfb { margin: 0; }
+  .dactions { margin-top: 0; gap: 6px; width: 100%; justify-content: center; }
+  .dactions button { padding: 9px 10px; flex: 0 1 auto; font-size: 13px; }
 }
